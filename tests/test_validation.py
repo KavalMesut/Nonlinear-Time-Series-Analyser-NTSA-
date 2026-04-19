@@ -172,14 +172,22 @@ def run_validation():
     # ===================== SUMMARY TABLE =====================
     total_elapsed = time.time() - total_start
     
-    print("\n" + "=" * 140)
-    print("SUMMARY: WOLF vs ROSENSTEIN (yan yana, secim kullaniciya aittir)")
-    print("=" * 140)
-    print(f"{'System':10s} | {'Exp LE':8s} | {'m':2s} | {'tau':3s} | "
-          f"{'Wolf LE':8s} | {'W.Err%':7s} | {'W.Std':6s} | "
-          f"{'Ros LE':8s} | {'R.Err%':7s} | {'R.R2':6s} | "
-          f"{'CV':6s} | {'Time':5s}")
-    print("-" * 140)
+    # Tablo satirlarini hem ekrana yaz hem dosyaya kaydet
+    lines = []
+    
+    def out(s=""):
+        print(s)
+        lines.append(s)
+    
+    out("\n" + "=" * 130)
+    out("SUMMARY: WOLF vs ROSENSTEIN (secim kullaniciya aittir)")
+    out("=" * 130)
+    out(f"{'System':10s} | {'Exp LE':8s} | {'m':2s} | {'tau':3s} | "
+        f"{'Wolf LE':8s} | {'W.Std':6s} | "
+        f"{'Ros LE':8s} | {'R.R2':6s} | "
+        f"{'CV':6s} | {'Time':5s} | "
+        f"{'W.Err%':7s} | {'R.Err%':7s}")
+    out("-" * 130)
     
     wolf_under10 = 0
     wolf_under20 = 0
@@ -206,32 +214,38 @@ def run_validation():
         cv_str = f"{s_cv:.3f}" if np.isfinite(s_cv) else "  N/A"
         stab_flag = "S" if s_stable else "U"
         
-        print(f"{name:10s} | {exp:8.4f} | {m:2d} | {tau:3d} | "
-              f"{wolf:8.4f} | {w_err:6.1f}% | {w_std:6.3f} | "
-              f"{ros:8.4f} | {r_err:6.1f}% | {r_r2:6.4f} | "
-              f"{cv_str}{stab_flag} | {elapsed:5.1f}s")
+        out(f"{name:10s} | {exp:8.4f} | {m:2d} | {tau:3d} | "
+            f"{wolf:8.4f} | {w_std:6.3f} | "
+            f"{ros:8.4f} | {r_r2:6.4f} | "
+            f"{cv_str}{stab_flag} | {elapsed:5.1f}s | "
+            f"{w_err:6.1f}% | {r_err:6.1f}%")
     
-    print("=" * 140)
+    out("=" * 130)
     
     # ===================== STATISTICS =====================
-    print(f"\n{'='*60}")
-    print("STATISTICS")
-    print(f"{'='*60}")
-    print(f"Wolf   (<10% error): {wolf_under10}/10")
-    print(f"Wolf   (<20% error): {wolf_under20}/10")
-    print(f"Rosenstein (<10%):   {ros_under10}/10")
-    print(f"Rosenstein (<20%):   {ros_under20}/10")
-    print(f"LE Stability (CV<0.20): {stable_count}/10")
-    print(f"Total time: {total_elapsed:.1f}s")
-    print(f"{'='*60}")
+    out(f"\n{'='*60}")
+    out("STATISTICS")
+    out(f"{'='*60}")
+    out(f"Wolf   (<10% error): {wolf_under10}/10")
+    out(f"Wolf   (<20% error): {wolf_under20}/10")
+    out(f"Rosenstein (<10%):   {ros_under10}/10")
+    out(f"Rosenstein (<20%):   {ros_under20}/10")
+    out(f"LE Stability (CV<0.20): {stable_count}/10")
+    out(f"Total time: {total_elapsed:.1f}s")
+    out(f"{'='*60}")
     
-    # Notes
-    print(f"\nNOTES:")
-    print(f"- Her iki algoritma bagimsiz olarak raporlanir, secim kullaniciya aittir.")
-    print(f"- Wolf: ODE sistemlerinde replacement bias nedeniyle overestimate yapabilir.")
-    print(f"- Rosenstein: Map'lerde doyum (saturation) nedeniyle underestimate yapabilir.")
-    print(f"- CV (varyasyon katsayisi): m+-1 ve tau+-10% ile LE degisimini olcer.")
-    print(f"  S = stabil (CV<0.20), U = unstabil (CV>=0.20).")
+    out(f"\nNOTES:")
+    out(f"- Her iki algoritma bagimsiz olarak raporlanir, secim kullaniciya aittir.")
+    out(f"- Wolf: ODE sistemlerinde replacement bias nedeniyle overestimate yapabilir.")
+    out(f"- Rosenstein: Map'lerde doyum (saturation) nedeniyle underestimate yapabilir.")
+    out(f"- CV (varyasyon katsayisi): m+-1 ve tau+-10% ile LE degisimini olcer.")
+    out(f"  S = stabil (CV<0.20), U = unstabil (CV>=0.20).")
+    
+    # test_sonuc.txt dosyasina kaydet
+    output_path = os.path.join(os.path.dirname(__file__), '..', 'test_sonuc.txt')
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+    print(f"\nSonuclar kaydedildi: {os.path.abspath(output_path)}")
 
 
 if __name__ == "__main__":
