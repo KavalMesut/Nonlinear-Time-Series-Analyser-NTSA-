@@ -1,17 +1,25 @@
 """
-Lyapunov exponent estimation.
+Lyapunov ustel tahmini.
 
-Primary method: Wolf's algorithm (Wolf et al., Physica 16D, 285-317, 1985)
-Optional: Rosenstein's algorithm (Rosenstein et al., 1993)
+Iki algoritma sunulur, secim kullaniciya aittir:
 
-Wolf implementation follows the original MATLAB code by Alan Wolf / Taehyeun Park,
-adapted to Python with KD-Tree based neighbor search.
+Wolf algoritmasi (Wolf et al., Physica 16D, 285-317, 1985)
+  - Ayrik haritalarda iyi calisir ancak surekli ODE sistemlerinde
+    replacement mekanizmasi nedeniyle sistematik olarak overestimate yapabilir.
+    Bu Wolf'un bilinen ve belgelenmis bir ozelligidir.
 
-Key design decisions matching the original:
-- Initial neighbor search has NO angle constraint (iflag=0)
-- Replacement search HAS angle constraint (iflag=1) with abs(dot) for cosine
-- When replacement fails, algorithm restarts neighbor search with expanded dismax (goto50)
-- dismin/dismax are auto-calibrated from the embedded space distance distribution
+Rosenstein algoritmasi (Rosenstein et al., 1993)
+  - Surekli sistemlerde genellikle daha guvenilir sonuclar verir.
+  - Map'lerde doyum (saturation) nedeniyle underestimate yapabilir.
+
+Wolf implementasyonu orijinal MATLAB koduna (Alan Wolf / Taehyeun Park) sadiktir,
+KD-Tree tabanli komsu arama ile Python'a uyarlanmistir.
+
+Onemli tasarim kararlari (orijinale uygun):
+- Ilk komsu aramada aci kisitlamasi YOK (iflag=0)
+- Replacement aramada aci kisitlamasi VAR (iflag=1), abs(dot) ile kosinus
+- Replacement basarisiz olursa, genisletilmis dismax ile yeniden arama (goto50)
+- dismin/dismax gomulme uzayindaki mesafe dagilimdan otomatik kalibre edilir
 """
 import numpy as np
 from scipy.spatial import cKDTree
@@ -628,7 +636,9 @@ def _auto_fit_linear_region(time_valid: np.ndarray, div_valid: np.ndarray) -> tu
         return full_c[0], float(full_r2), start_skip, n
     
     # Phase 2: Rolling slope ratio saturation detection
-    # Initial slope from first few points
+    # Ilk birkac noktadan baslangic egimi hesapla, sonra kayan pencere ile
+    # egimin %25'in altina dustugu yeri bul (doyuma ulasti).
+    # Birden fazla pencere boyutu deneyerek en iyi R^2 veren fit araligini sec.
     init_len = max(3, min(5, n_fit // 10 + 3))
     c_init = np.polyfit(fit_t[:init_len], fit_d[:init_len], 1)
     initial_slope = c_init[0]
@@ -636,29 +646,43 @@ def _auto_fit_linear_region(time_valid: np.ndarray, div_valid: np.ndarray) -> tu
     if initial_slope <= 0:
         return full_c[0], float(full_r2), start_skip, n
     
-    # Rolling window: try small then larger
-    saturation_idx = n_fit
-    win_size = max(3, min(n_fit // 15, 15))
+    # Birden fazla pencere boyutu dene, her biri icin saturation noktasi bul
+    best_fit_r2 = -1.0
+    best_fit_result = (full_c[0], float(full_r2), start_skip, n)
     
-    for i in range(init_len, n_fit - win_size + 1):
-        local_c = np.polyfit(fit_t[i:i + win_size], fit_d[i:i + win_size], 1)
-        ratio = local_c[0] / initial_slope
-        if ratio < 0.25:
-            saturation_idx = i
-            break
+    win_sizes = set()
+    for frac in [10, 15, 20, 25]:
+        ws = max(3, n_fit // frac)
+        win_sizes.add(ws)
+    win_sizes = sorted(win_sizes)
     
-    saturation_idx = max(saturation_idx, init_len)
+    for win_size in win_sizes:
+        saturation_idx = n_fit
+        for i in range(init_len, n_fit - win_size + 1):
+            local_c = np.polyfit(fit_t[i:i + win_size], fit_d[i:i + win_size], 1)
+            ratio = local_c[0] / initial_slope
+            if ratio < 0.25:
+                saturation_idx = i
+                break
+        
+        saturation_idx = max(saturation_idx, init_len)
+        fit_end = min(saturation_idx, n_fit)
+        
+        if fit_end < 3:
+            continue
+        
+        c = np.polyfit(fit_t[:fit_end], fit_d[:fit_end], 1)
+        f = np.polyval(c, fit_t[:fit_end])
+        sr = np.sum((fit_d[:fit_end] - f) ** 2)
+        st = np.sum((fit_d[:fit_end] - np.mean(fit_d[:fit_end])) ** 2)
+        r2 = 1.0 - sr / st if st > 1e-30 else 0.0
+        
+        if c[0] > 0 and r2 > best_fit_r2:
+            best_fit_r2 = r2
+            best_fit_result = (c[0], float(r2), start_skip, start_skip + fit_end)
     
-    # Fit pre-saturation region
-    fit_end = min(saturation_idx, n_fit)
-    c = np.polyfit(fit_t[:fit_end], fit_d[:fit_end], 1)
-    f = np.polyval(c, fit_t[:fit_end])
-    sr = np.sum((fit_d[:fit_end] - f) ** 2)
-    st = np.sum((fit_d[:fit_end] - np.mean(fit_d[:fit_end])) ** 2)
-    r2 = 1.0 - sr / st if st > 1e-30 else 0.0
-    
-    if c[0] > 0:
-        return c[0], float(r2), start_skip, start_skip + fit_end
+    if best_fit_result[0] > 0:
+        return best_fit_result
     
     return full_c[0], float(full_r2), start_skip, n
 

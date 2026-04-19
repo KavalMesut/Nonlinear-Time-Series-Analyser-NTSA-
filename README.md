@@ -22,12 +22,12 @@ Kaotik zaman serilerinin doğrusal olmayan analizi icin gelistirilmis masaustu u
 |--------|------------|---------------|--------|--------|
 | Lorenz | 0.9056 | 1.0044 | 10.9% | Rosenstein |
 | Rossler | 0.0714 | 0.0579 | 19.0% | Rosenstein |
-| Chua | 0.33 | 0.3465 | 5.0% | Wolf |
-| Chen | 2.027 | 1.9215 | 5.2% | Rosenstein |
-| Duffing | 0.159 | 0.0855 | 46.6% | Rosenstein |
-| Logistic (r=4) | 0.6931 | 0.6928 | 0.1% | Wolf |
-| Henon | 0.4192 | 0.4170 | 0.7% | Rosenstein |
-| Tent | 0.6931 | 0.7328 | 5.7% | Rosenstein |
+| Chua | 0.33 | 0.3619 | 9.7% | Rosenstein |
+| Chen | 2.027 | 1.9179 | 5.4% | Rosenstein |
+| Duffing | 0.16 | 0.0834 | 47.9% | Rosenstein |
+| Logistic (r=4) | 0.6931 | 0.6927 | 0.1% | Rosenstein |
+| Henon | 0.4200 | 0.4200 | 0.0% | Rosenstein |
+| Tent | 0.6931 | 0.6948 | 0.2% | Rosenstein |
 | Sine | 0.6931 | 0.6889 | 0.6% | Rosenstein |
 | Ikeda | 0.51 | 0.4858 | 4.7% | Rosenstein |
 
@@ -109,7 +109,8 @@ tseriesanalyser/
 
 - **Parametre secimi veri tabanlıdır**: tau ve m degerleri AMI ve FNN ile otomatik hesaplanir; elle ayar yapilmaz.
 - **Wolf algoritmasi** orijinal MATLAB implementasyonuna (Alan Wolf, 1985) sadik kalir. Wolf dogasi geregi overestimate yapabilir — bu algoritmanin bilinen bir ozelliidir.
-- **Rosenstein auto-fit** tam egri R^2 >= 0.98 kontrolu + rolling slope doyum tespiti (oran < 0.25) kullanir.
+- **Rosenstein auto-fit** tam egri R^2 >= 0.98 kontrolu + coklu pencere boyutlu rolling slope doyum tespiti kullanir.
+- **LE stabilite testi**: m+-1 ve tau+-10% varyasyonlari ile hesaplanan CV (varyasyon katsayisi) < 0.20 ise sonuc guvenilir kabul edilir. 8/10 sistemde stabil.
 - **KD-Tree** (scipy.spatial.cKDTree) komsu aramalarinda kullanilir (Wolf ve Rosenstein).
 
 ## Validasyon Testlerini Calistirma

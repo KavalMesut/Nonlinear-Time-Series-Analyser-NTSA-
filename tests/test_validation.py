@@ -2,22 +2,19 @@
 Validation tests for 10 chaotic systems.
 5 Continuous ODE Systems, 5 Discrete Maps.
 
+Her iki algoritma (Wolf ve Rosenstein) bagimsiz olarak test edilir,
+sonuclar tek tabloda yan yana sunulur. Hangisinin kullanilacagi
+kullanicinin kararindadir (UI'da elle secilir).
+
 Constraints:
 1. m and tau must be purely data-driven (AMI and FNN).
-2. Robustness check: m+-1, tau+-10% variations.
-
-Evaluation criteria:
-- Wolf algorithm: Known to overestimate for continuous systems due to
-  replacement mechanism (Wolf et al., 1985). Accurate for maps.
-  Threshold: <5% for maps, <25% for continuous (accepting inherent bias).
-- Rosenstein algorithm: Generally underestimates due to saturation effects.
-  Threshold: <20% for continuous, <25% for maps.
-- "Best estimate": min error across both algorithms per system.
+2. LE stability check: m+-1, tau+-10% variations (CV metric).
 
 Outputs:
 - Wolf LE with standard deviation and convergence metric
 - Rosenstein LE with R^2 fit quality
-- Comparative summary table with previous results
+- LE stability (CV) for Rosenstein
+- Comparative summary table
 """
 import numpy as np
 import sys
@@ -38,56 +35,42 @@ from analysis import (
 )
 
 
-# Previous test results (before optimization) for comparison
-PREVIOUS_RESULTS = {
-    'Lorenz':   {'wolf': 0.8958, 'wolf_err': 0.5,   'ros': 1.7000, 'ros_err': 88.9},
-    'Rossler':  {'wolf': 0.0550, 'wolf_err': 23.0,  'ros': 0.0749, 'ros_err': 4.9},
-    'Chua':     {'wolf': 0.2717, 'wolf_err': 288.1, 'ros': 0.4440, 'ros_err': 534.3},
-    'Chen':     {'wolf': 1.7206, 'wolf_err': 14.8,  'ros': 3.3221, 'ros_err': 64.5},
-    'Duffing':  {'wolf': -0.0005,'wolf_err': 100.3, 'ros': 0.0002, 'ros_err': 99.9},
-    'Logistic': {'wolf': 0.6926, 'wolf_err': 0.1,   'ros': np.nan, 'ros_err': np.nan},
-    'Henon':    {'wolf': 0.4199, 'wolf_err': 0.0,   'ros': 0.3129, 'ros_err': 25.5},
-    'Tent':     {'wolf': np.nan, 'wolf_err': np.nan, 'ros': np.nan, 'ros_err': np.nan},
-    'Sine Map': {'wolf': 0.6877, 'wolf_err': 0.8,   'ros': 0.3926, 'ros_err': 43.3},
-    'Ikeda':    {'wolf': 0.2187, 'wolf_err': 56.5,  'ros': 0.1836, 'ros_err': 63.5},
-}
-
-
-def check_robustness(data, m_base, tau_base, dt, expected, evolve_steps,
-                     initial_d=None, rep_t=None):
-    """Run Wolf algorithm with m+-1, tau+-10% variations."""
-    variations = [
-        ("Base (m, tau)", m_base, tau_base),
-        ("m+1", m_base + 1, tau_base),
-    ]
-    if m_base > 1:
-        variations.append(("m-1", m_base - 1, tau_base))
-    
-    if tau_base > 1:
-        tau_plus = int(np.ceil(tau_base * 1.1))
-        tau_minus = int(np.floor(tau_base * 0.9))
-        if tau_plus == tau_base:
-            tau_plus += 1
-        if tau_minus == tau_base:
-            tau_minus -= 1
-        variations.append(("tau+10%", m_base, max(1, tau_plus)))
-        variations.append(("tau-10%", m_base, max(1, tau_minus)))
+def compute_le_stability(data, m, tau, dt, method='rosenstein', evolve_steps=1):
+    """
+    LE stabilite testi: m+-1 ve tau+-10% varyasyonlari ile LE hesapla.
+    CV < 0.20 ise stabil, aksi halde unstable.
+    """
+    variations = [("base", m, tau), ("m+1", m + 1, tau)]
+    if m > 2:
+        variations.append(("m-1", m - 1, tau))
+    if tau > 1:
+        tau_plus = max(tau + 1, int(np.ceil(tau * 1.1)))
+        tau_minus = max(1, min(tau - 1, int(np.floor(tau * 0.9))))
+        variations.append(("tau+10%", m, tau_plus))
+        variations.append(("tau-10%", m, tau_minus))
 
     results = []
-    print(f"\n  --- Robustness (Wolf, Target: {expected:.4f}) ---")
-    for name, m_test, tau_test in variations:
-        lyap = lyapunov_wolf(data, m=m_test, tau=tau_test, dt=dt,
-                             evolve_steps=evolve_steps,
-                             initial_neighbor_distance=initial_d,
-                             replacement_threshold=rep_t)
-        if np.isfinite(lyap) and expected != 0:
-            err = abs(lyap - expected) / abs(expected) * 100
+    details = []
+    for name, m_v, tau_v in variations:
+        if method == 'rosenstein':
+            t_steps, div = lyapunov_rosenstein(data, m=m_v, tau=tau_v, dt=dt)
+            le = estimate_lyapunov_from_curve(t_steps, div)
         else:
-            err = float('nan')
-        print(f"  {name:15s} (m={m_test}, tau={tau_test:2d}): LE={lyap:.4f} (Err:{err:6.1f}%)")
-        results.append(lyap)
-        
-    return results[0]
+            le = lyapunov_wolf(data, m=m_v, tau=tau_v, dt=dt, evolve_steps=evolve_steps)
+        details.append({'name': name, 'm': m_v, 'tau': tau_v, 'le': le})
+        if np.isfinite(le):
+            results.append(le)
+
+    if len(results) < 2:
+        return {'le_mean': results[0] if results else np.nan,
+                'le_std': np.nan, 'cv': np.nan, 'variations': details, 'stable': False}
+
+    le_arr = np.array(results)
+    le_mean = float(np.mean(le_arr))
+    le_std = float(np.std(le_arr))
+    cv = le_std / abs(le_mean) if abs(le_mean) > 1e-10 else np.nan
+    return {'le_mean': le_mean, 'le_std': le_std, 'cv': float(cv),
+            'variations': details, 'stable': np.isfinite(cv) and cv < 0.20}
 
 
 def run_validation():
@@ -98,13 +81,13 @@ def run_validation():
     total_start = time.time()
 
     # (Name, Generator, Expected_LE, dt, evolve_steps, is_map, extra_params)
-    # Expected LE values from Jacobian/analytical calculations:
+    # extra_params may contain 'transient' key for ODE systems (default: 2000)
     systems = [
         ("Lorenz",   generate_lorenz,  0.9056, 0.01, 8,  False, {}),
         ("Rossler",  generate_rossler, 0.0714, 0.1,  1,  False, {'t_span': (0, 2000)}),
         ("Chua",     generate_chua,    0.33,   0.1,  1,  False, {'t_span': (0, 2000)}),
         ("Chen",     generate_chen,    2.027,  0.01, 5,  False, {}),
-        ("Duffing",  generate_duffing, 0.16,   0.1,  1,  False, {'t_span': (0, 5000), 'gamma': 0.5}),
+        ("Duffing",  generate_duffing, 0.16,   0.1,  1,  False, {'t_span': (0, 6000), 'gamma': 0.5, 'transient': 5000}),
         ("Logistic", logistic_map,     np.log(2), 1.0, 1, True, {}),
         ("Henon",    henon_map,        0.4200, 1.0,  1,  True, {}),
         ("Tent",     tent_map,         np.log(2), 1.0, 1, True, {}),
@@ -125,9 +108,10 @@ def run_validation():
             tau = 1
         else:
             t_span = params.get('t_span', (0, 200))
-            gen_params = {k: v for k, v in params.items() if k != 't_span'}
+            transient = params.get('transient', 2000)
+            gen_params = {k: v for k, v in params.items() if k not in ('t_span', 'transient')}
             ts = gen(t_span=t_span, dt=dt, **gen_params)
-            data = ts.data[2000:]
+            data = ts.data[transient:]
             ami = compute_ami(data, max_lag=100)
             tau = find_first_minimum(ami)
             
@@ -148,10 +132,12 @@ def run_validation():
         wolf_std = wolf_detail['std']
         wolf_conv = wolf_detail['convergence']
         
-        print(f"  Wolf LE     = {calc_wolf:.4f} (std={wolf_std:.4f}, conv={wolf_conv:.4f})")
+        if exp != 0 and np.isfinite(calc_wolf):
+            err_wolf = abs(calc_wolf - exp) / abs(exp) * 100
+        else:
+            err_wolf = float('nan')
         
-        # --- Robustness ---
-        check_robustness(data, m, tau, dt, exp, ev)
+        print(f"  Wolf LE     = {calc_wolf:.4f} | Err: {err_wolf:.1f}% | std={wolf_std:.4f} | conv={wolf_conv:.4f}")
         
         # --- Rosenstein Detailed ---
         t_steps, divergence = lyapunov_rosenstein(data, m=m, tau=tau, dt=dt)
@@ -159,155 +145,93 @@ def run_validation():
         calc_ros = ros_detail['le']
         ros_r2 = ros_detail['r2']
         
-        print(f"  Rosenstein  = {calc_ros:.4f} (R2={ros_r2:.4f}, fit=[{ros_detail['fit_start']}:{ros_detail['fit_end']}])")
-        
-        # --- Errors ---
-        if exp != 0 and np.isfinite(calc_wolf):
-            err_wolf = abs(calc_wolf - exp) / abs(exp) * 100
-        else:
-            err_wolf = float('nan')
-        
         if exp != 0 and np.isfinite(calc_ros):
             err_ros = abs(calc_ros - exp) / abs(exp) * 100
         else:
             err_ros = float('nan')
         
-        # Best estimate
-        best_err = min(
-            err_wolf if np.isfinite(err_wolf) else 999,
-            err_ros if np.isfinite(err_ros) else 999
-        )
-        best_le = calc_wolf if (np.isfinite(err_wolf) and err_wolf <= err_ros) else calc_ros
-        best_method = "Wolf" if (np.isfinite(err_wolf) and err_wolf <= (err_ros if np.isfinite(err_ros) else 999)) else "Ros"
+        print(f"  Rosenstein  = {calc_ros:.4f} | Err: {err_ros:.1f}% | R2={ros_r2:.4f} | fit=[{ros_detail['fit_start']}:{ros_detail['fit_end']}]")
+        
+        # --- LE Stabilite Testi (Rosenstein) ---
+        stability = compute_le_stability(data, m=m, tau=tau, dt=dt, method='rosenstein')
+        stab_cv = stability['cv']
+        stab_mark = "STABLE" if stability['stable'] else "UNSTABLE"
+        print(f"  Stability   = CV={stab_cv:.3f} ({stab_mark})"
+              f" | mean={stability['le_mean']:.4f} std={stability['le_std']:.4f}")
+        for v in stability['variations']:
+            print(f"    {v['name']:10s}: m={v['m']}, tau={v['tau']}, LE={v['le']:.4f}")
         
         elapsed = time.time() - sys_start
-        print(f"  Best: {best_method} = {best_le:.4f} ({best_err:.1f}%) | Time: {elapsed:.1f}s")
+        print(f"  Time: {elapsed:.1f}s")
         
         summary.append((name, exp, m, tau, is_map,
-                         calc_wolf, err_wolf, wolf_std, wolf_conv,
+                         calc_wolf, err_wolf, wolf_std,
                          calc_ros, err_ros, ros_r2,
-                         best_le, best_err, best_method, elapsed))
+                         stab_cv, stability['stable'], elapsed))
 
     # ===================== SUMMARY TABLE =====================
     total_elapsed = time.time() - total_start
     
     print("\n" + "=" * 140)
-    print("CURRENT RESULTS")
+    print("SUMMARY: WOLF vs ROSENSTEIN (yan yana, secim kullaniciya aittir)")
     print("=" * 140)
     print(f"{'System':10s} | {'Exp LE':8s} | {'m':2s} | {'tau':3s} | "
           f"{'Wolf LE':8s} | {'W.Err%':7s} | {'W.Std':6s} | "
           f"{'Ros LE':8s} | {'R.Err%':7s} | {'R.R2':6s} | "
-          f"{'Best':8s} | {'B.Err%':7s} | {'Method':6s} | {'Time':5s}")
+          f"{'CV':6s} | {'Time':5s}")
     print("-" * 140)
     
-    wolf_pass_strict = 0  # <3%
-    wolf_pass_loose = 0   # <25%
-    ros_pass = 0           # <20%
-    best_pass = 0          # <10%
+    wolf_under10 = 0
+    wolf_under20 = 0
+    ros_under10 = 0
+    ros_under20 = 0
+    stable_count = 0
     
     for (name, exp, m, tau, is_map,
-         wolf, w_err, w_std, w_conv,
+         wolf, w_err, w_std,
          ros, r_err, r_r2,
-         best, b_err, b_method, elapsed) in summary:
+         s_cv, s_stable, elapsed) in summary:
         
-        if np.isfinite(w_err) and w_err < 3.0:
-            wolf_pass_strict += 1
-        if np.isfinite(w_err) and w_err < 25.0:
-            wolf_pass_loose += 1
+        if np.isfinite(w_err) and w_err < 10.0:
+            wolf_under10 += 1
+        if np.isfinite(w_err) and w_err < 20.0:
+            wolf_under20 += 1
+        if np.isfinite(r_err) and r_err < 10.0:
+            ros_under10 += 1
         if np.isfinite(r_err) and r_err < 20.0:
-            ros_pass += 1
-        if np.isfinite(b_err) and b_err < 10.0:
-            best_pass += 1
+            ros_under20 += 1
+        if s_stable:
+            stable_count += 1
         
-        b_mark = "*" if np.isfinite(b_err) and b_err < 10.0 else " "
+        cv_str = f"{s_cv:.3f}" if np.isfinite(s_cv) else "  N/A"
+        stab_flag = "S" if s_stable else "U"
         
         print(f"{name:10s} | {exp:8.4f} | {m:2d} | {tau:3d} | "
               f"{wolf:8.4f} | {w_err:6.1f}% | {w_std:6.3f} | "
               f"{ros:8.4f} | {r_err:6.1f}% | {r_r2:6.4f} | "
-              f"{best:8.4f} | {b_err:6.1f}% | {b_method:6s} | {elapsed:5.1f}s {b_mark}")
+              f"{cv_str}{stab_flag} | {elapsed:5.1f}s")
     
     print("=" * 140)
     
-    # ===================== COMPARISON WITH PREVIOUS =====================
-    print("\n" + "=" * 120)
-    print("COMPARISON: PREVIOUS vs CURRENT")
-    print("=" * 120)
-    print(f"{'System':10s} | {'Prev Wolf':10s} | {'Curr Wolf':10s} | {'W.Change':8s} | "
-          f"{'Prev Ros':10s} | {'Curr Ros':10s} | {'R.Change':8s} | {'Best Err':8s}")
-    print("-" * 120)
-    
-    prev_best_count = 0
-    curr_best_count = 0
-    
-    for (name, exp, m, tau, is_map,
-         wolf, w_err, w_std, w_conv,
-         ros, r_err, r_r2,
-         best, b_err, b_method, elapsed) in summary:
-        
-        prev = PREVIOUS_RESULTS.get(name, {})
-        pw_err = prev.get('wolf_err', np.nan)
-        pr_err = prev.get('ros_err', np.nan)
-        
-        # Wolf change
-        if np.isfinite(pw_err) and np.isfinite(w_err):
-            w_change = w_err - pw_err
-            w_dir = "BETTER" if w_change < -2 else ("WORSE" if w_change > 2 else "~same")
-        else:
-            w_change = np.nan
-            w_dir = "N/A"
-        
-        # Rosenstein change
-        if np.isfinite(pr_err) and np.isfinite(r_err):
-            r_change = r_err - pr_err
-            r_dir = "BETTER" if r_change < -2 else ("WORSE" if r_change > 2 else "~same")
-        else:
-            r_change = np.nan
-            r_dir = "N/A"
-        
-        # Previous best error
-        prev_best = min(
-            pw_err if np.isfinite(pw_err) else 999,
-            pr_err if np.isfinite(pr_err) else 999
-        )
-        if prev_best < 999:
-            prev_best_str = f"{prev_best:.1f}%"
-        else:
-            prev_best_str = "N/A"
-        
-        if np.isfinite(prev_best) and prev_best < 10:
-            prev_best_count += 1
-        if np.isfinite(b_err) and b_err < 10:
-            curr_best_count += 1
-        
-        print(f"{name:10s} | {pw_err:6.1f}% {prev.get('wolf', 0):+.2f} | {w_err:6.1f}% {wolf:+.4f} | {w_dir:8s} | "
-              f"{pr_err:6.1f}% {prev.get('ros', 0):+.2f} | {r_err:6.1f}% {ros:+.4f} | {r_dir:8s} | {b_err:6.1f}%")
-    
-    print("=" * 120)
-    
-    # ===================== FINAL STATISTICS =====================
+    # ===================== STATISTICS =====================
     print(f"\n{'='*60}")
     print("STATISTICS")
     print(f"{'='*60}")
-    print(f"Wolf  (strict <3%):  {wolf_pass_strict}/10")
-    print(f"Wolf  (loose <25%):  {wolf_pass_loose}/10")
-    print(f"Rosenstein (<20%):   {ros_pass}/10")
-    print(f"Best estimate (<10%): {best_pass}/10")
+    print(f"Wolf   (<10% error): {wolf_under10}/10")
+    print(f"Wolf   (<20% error): {wolf_under20}/10")
+    print(f"Rosenstein (<10%):   {ros_under10}/10")
+    print(f"Rosenstein (<20%):   {ros_under20}/10")
+    print(f"LE Stability (CV<0.20): {stable_count}/10")
     print(f"Total time: {total_elapsed:.1f}s")
-    print(f"")
-    print(f"Previous best (<10%): {prev_best_count}/10")
-    print(f"Current best  (<10%): {curr_best_count}/10")
     print(f"{'='*60}")
     
     # Notes
     print(f"\nNOTES:")
-    print(f"- Wolf algorithm has inherent positive bias for continuous ODE systems")
-    print(f"  due to replacement mechanism (Wolf et al., 1985). This is expected.")
-    print(f"- Rosenstein algorithm tends to underestimate for maps due to rapid")
-    print(f"  saturation of the divergence curve.")
-    print(f"- 'Best estimate' picks the algorithm with lowest error per system.")
-    print(f"- Previous Chua expected LE was 0.07 (corrected to 0.33 for double-scroll)")
-    print(f"- Previous Duffing was in periodic regime (corrected to gamma=0.5, chaotic)")
-    print(f"- Tent map previously gave NaN (fixed with floating-point perturbation)")
+    print(f"- Her iki algoritma bagimsiz olarak raporlanir, secim kullaniciya aittir.")
+    print(f"- Wolf: ODE sistemlerinde replacement bias nedeniyle overestimate yapabilir.")
+    print(f"- Rosenstein: Map'lerde doyum (saturation) nedeniyle underestimate yapabilir.")
+    print(f"- CV (varyasyon katsayisi): m+-1 ve tau+-10% ile LE degisimini olcer.")
+    print(f"  S = stabil (CV<0.20), U = unstabil (CV>=0.20).")
 
 
 if __name__ == "__main__":
