@@ -1,0 +1,689 @@
+"""
+Lyapunov exponent estimation.
+
+Primary method: Wolf's algorithm (Wolf et al., Physica 16D, 285-317, 1985)
+Optional: Rosenstein's algorithm (Rosenstein et al., 1993)
+
+Wolf implementation follows the original MATLAB code by Alan Wolf / Taehyeun Park,
+adapted to Python with KD-Tree based neighbor search.
+
+Key design decisions matching the original:
+- Initial neighbor search has NO angle constraint (iflag=0)
+- Replacement search HAS angle constraint (iflag=1) with abs(dot) for cosine
+- When replacement fails, algorithm restarts neighbor search with expanded dismax (goto50)
+- dismin/dismax are auto-calibrated from the embedded space distance distribution
+"""
+import numpy as np
+from scipy.spatial import cKDTree
+
+from .embedding import embed_timeseries
+
+
+def _build_kdtree(embedded: np.ndarray) -> cKDTree:
+    """Build a KD-Tree for fast neighbor lookup."""
+    return cKDTree(embedded)
+
+
+def _estimate_distance_params(embedded: np.ndarray, tree: cKDTree,
+                              min_tsep: int, n_sample: int = 2000) -> tuple:
+    """
+    Estimate appropriate dismin and dismax from the embedded space.
+    
+    Strategy: Use the attractor scale (std of embedded coordinates) to set
+    dismax as a small fraction of the attractor size, similar to how Wolf
+    sets dismax relative to the attractor (e.g., dismax=0.3 for Lorenz with
+    attractor diameter ~40).
+    
+    dismin is set relative to dismax (dismin = dismax / 100).
+    
+    Returns:
+        (dismin, dismax)
+    """
+    # Compute attractor scale as RMS of per-dimension standard deviations
+    # This gives a characteristic length scale of the attractor
+    std_per_dim = np.std(embedded, axis=0)
+    attractor_scale = np.sqrt(np.sum(std_per_dim**2))
+    
+    # Wolf's Lorenz example: attractor_scale ≈ 15-20, dismax = 0.3
+    # That's roughly 1.5-2% of attractor_scale
+    # We use 2% as a good universal default
+    dismax = attractor_scale * 0.02
+    dismin = dismax / 100.0
+    
+    return max(dismin, 1e-12), max(dismax, 1e-8)
+
+
+def _find_neighbor_wolf(embedded: np.ndarray, tree: cKDTree,
+                        reference_idx: int, min_tsep: int, evolve_steps: int,
+                        dismin: float, dismax: float,
+                        n_usable: int,
+                        direction_vector: np.ndarray = None,
+                        oldist: float = None,
+                        max_angle_deg: float = 30.0,
+                        iflag: int = 0) -> tuple:
+    """
+    Find a valid neighbor following Wolf's search logic.
+    
+    Args:
+        embedded: embedded phase space points
+        tree: KD-Tree for fast neighbor search
+        reference_idx: index of the fiducial point
+        min_tsep: minimum temporal separation
+        evolve_steps: evolution steps
+        dismin: minimum allowed distance (absolute)
+        dismax: maximum allowed distance (absolute)
+        n_usable: last usable index in the time series
+        direction_vector: separation vector for angle-preserving replacement
+        oldist: old pair distance (for angle computation)
+        max_angle_deg: maximum angle for replacement (degrees)
+        iflag: 0 = no angle check (initial search), 1 = angle check (replacement)
+    
+    Returns:
+        (best_point_idx, best_distance, best_angle) or (-1, inf, 180) if not found
+    """
+    n_points = len(embedded)
+    reference = embedded[reference_idx]
+    
+    # Query KD-Tree for candidates within dismax
+    candidate_indices = tree.query_ball_point(reference, dismax)
+    
+    if len(candidate_indices) == 0:
+        return -1, np.inf, 180.0
+    
+    candidate_indices = np.array(candidate_indices)
+    
+    # Filter: temporal separation from fiducial point (Wolf search.m line 101)
+    temporal_mask = np.abs(candidate_indices - reference_idx) >= min_tsep
+    # Filter: candidate must not be within 2*evolve of end-of-data (Wolf search.m line 104)
+    usable_mask = candidate_indices <= n_usable - 2 * evolve_steps
+    # Filter: minimum distance and non-zero
+    candidate_vectors = embedded[candidate_indices] - reference
+    candidate_distances = np.linalg.norm(candidate_vectors, axis=1)
+    dist_mask = (candidate_distances >= dismin) & (candidate_distances > 0)
+    
+    combined_mask = temporal_mask & usable_mask & dist_mask
+    
+    if not np.any(combined_mask):
+        return -1, np.inf, 180.0
+    
+    filtered_indices = candidate_indices[combined_mask]
+    filtered_distances = candidate_distances[combined_mask]
+    filtered_vectors = candidate_vectors[combined_mask]
+    
+    # Wolf's search uses progressive narrowing: both bstdis and thbest
+    # are initialized to dismax and thmax, then each accepted candidate
+    # tightens BOTH bounds. A candidate must beat the current best in
+    # BOTH distance AND angle (search.m lines 119, 132-138).
+    
+    if iflag == 1 and direction_vector is not None and oldist is not None and oldist > 0:
+        dir_norm = np.linalg.norm(direction_vector)
+        if dir_norm > 1e-18:
+            dots = np.abs(filtered_vectors @ direction_vector)
+            cosines = dots / (filtered_distances * dir_norm)
+            cosines = np.clip(cosines, 0.0, 1.0)
+            angles = np.degrees(np.arccos(cosines))
+            
+            # Progressive narrowing: iterate candidates sorted by distance,
+            # accepting only if both distance < bstdis AND angle < thbest
+            bstdis = dismax
+            thbest = max_angle_deg
+            best_point = -1
+            best_d = np.inf
+            best_a = 180.0
+            
+            # Sort by distance ascending (Wolf iterates through box structure,
+            # but the progressive narrowing logic is order-dependent)
+            sort_order = np.argsort(filtered_distances)
+            for si in sort_order:
+                d = filtered_distances[si]
+                a = angles[si]
+                if d >= bstdis:
+                    continue
+                if a >= thbest:
+                    continue
+                # This candidate beats both bounds — accept and narrow
+                bstdis = d
+                thbest = a
+                best_point = int(filtered_indices[si])
+                best_d = float(d)
+                best_a = float(a)
+            
+            if best_point >= 0:
+                return best_point, best_d, best_a
+            else:
+                return -1, np.inf, 180.0
+    
+    # iflag == 0: no angle check, just pick closest (Wolf: tdist < bstdis)
+    # Also enforce distance < dismax (bstdis initialized to dismax)
+    dist_ok = filtered_distances < dismax
+    if not np.any(dist_ok):
+        # All within dismax from KD-Tree query, but check strict <
+        best_idx = np.argmin(filtered_distances)
+        return int(filtered_indices[best_idx]), float(filtered_distances[best_idx]), -1.0
+    
+    best_idx = np.argmin(filtered_distances)
+    return int(filtered_indices[best_idx]), float(filtered_distances[best_idx]), -1.0
+
+
+def lyapunov_wolf(data: np.ndarray, m: int, tau: int,
+                  dt: float = 1.0,
+                  initial_neighbor_distance: float = None,
+                  replacement_threshold: float = None,
+                  max_iterations: int = None,
+                  min_tsep: int = None,
+                  evolve_steps: int = 1,
+                  min_neighbor_distance: float = None,
+                  replacement_angle_deg: float = 30.0) -> float:
+    """
+    Estimate the largest Lyapunov exponent using Wolf's algorithm.
+    
+    Follows Wolf et al., Physica 16D, 285-317 (1985).
+    
+    Args:
+        data: 1D time series array
+        m: embedding dimension
+        tau: time delay
+        dt: time step between samples
+        initial_neighbor_distance: dismax for neighbor search. If None, auto-calibrated.
+        replacement_threshold: distance above which replacement is triggered. If None, auto-set.
+        max_iterations: maximum number of evolution steps
+        min_tsep: minimum temporal separation (Theiler window). Default: max(evolve_steps, m*tau).
+        evolve_steps: number of steps to evolve before checking replacement
+        min_neighbor_distance: dismin - minimum neighbor distance. If None, auto-calibrated.
+        replacement_angle_deg: max angle for replacement (degrees). Default: 30.
+    
+    Returns:
+        Largest Lyapunov exponent in nats per time unit.
+    """
+    embedded = embed_timeseries(data, m, tau)
+    n_points = len(embedded)
+
+    if n_points <= evolve_steps + 1:
+        return np.nan
+
+    # Wolf's temporal separation: abs(runner - oldpnt) < evolve (search.m line 101)
+    if min_tsep is None:
+        min_tsep = evolve_steps
+
+    if max_iterations is None:
+        max_iterations = n_points
+
+    # Build KD-Tree
+    tree = _build_kdtree(embedded)
+
+    # Auto-calibrate distance parameters from embedded space
+    if min_neighbor_distance is None or initial_neighbor_distance is None:
+        auto_dismin, auto_dismax = _estimate_distance_params(embedded, tree, min_tsep)
+        if min_neighbor_distance is None:
+            min_neighbor_distance = auto_dismin
+        if initial_neighbor_distance is None:
+            initial_neighbor_distance = auto_dismax
+
+    if replacement_threshold is None:
+        replacement_threshold = initial_neighbor_distance
+
+    # Wolf: datuse = datcnt - (ndim-1)*tau - evolve (1-indexed)
+    # oldpnt >= datuse means stop. Max valid oldpnt = datuse - 1.
+    # In 0-indexed: n_usable = n_points - 1 - (m-1)*tau - evolve_steps - 1
+    # But embedded already accounts for (m-1)*tau, so:
+    # n_usable = n_points - evolve_steps - 1  (but -1 more for 0-index correction)
+    n_usable = n_points - evolve_steps - 1
+
+    lyapunov_sum = 0.0
+    iterations = 0
+    current_idx = 0
+
+    # === MAIN LOOP (Wolf's goto50 equivalent) ===
+    while current_idx <= n_usable:
+        # --- Find initial neighbor (iflag=0, no angle constraint) ---
+        search_dismax = initial_neighbor_distance
+        neighbor_idx = -1
+        
+        while neighbor_idx < 0:
+            neighbor_idx, current_dist, _ = _find_neighbor_wolf(
+                embedded, tree, current_idx, min_tsep, evolve_steps,
+                min_neighbor_distance, search_dismax, n_usable,
+                iflag=0
+            )
+            if neighbor_idx < 0:
+                search_dismax *= 2.0
+                if search_dismax > np.std(embedded[:, 0]) * 100:
+                    break
+        
+        if neighbor_idx < 0:
+            current_idx += evolve_steps
+            continue
+
+        disold = current_dist
+
+        # === EVOLUTION LOOP (Wolf's goto60 equivalent) ===
+        while True:
+            current_idx += evolve_steps
+            neighbor_idx += evolve_steps
+            
+            if current_idx > n_usable:
+                break
+            
+            if neighbor_idx >= n_points:
+                current_idx -= evolve_steps
+                break
+            
+            disnew = np.linalg.norm(embedded[current_idx] - embedded[neighbor_idx])
+            
+            # Wolf: SUM = SUM + log(disnew/disold) — no filter (fet.m line 75)
+            # disnew==0 would give -inf but is extremely rare in practice
+            if disold > 0 and disnew > 0:
+                lyapunov_sum += np.log(disnew / disold)
+            elif disold > 0:
+                # disnew == 0: degenerate case, use a very small value
+                lyapunov_sum += np.log(1e-18 / disold)
+            iterations += 1
+            
+            if iterations >= max_iterations:
+                break
+            
+            # Check if replacement is needed
+            if disnew <= replacement_threshold:
+                disold = disnew
+                continue
+            
+            # --- Replacement search (iflag=1, with angle constraint) ---
+            direction = embedded[current_idx] - embedded[neighbor_idx]
+            
+            best_neighbor, best_dist, _ = _find_neighbor_wolf(
+                embedded, tree, current_idx, min_tsep, evolve_steps,
+                min_neighbor_distance, initial_neighbor_distance, n_usable,
+                direction_vector=direction,
+                oldist=disnew,
+                max_angle_deg=replacement_angle_deg,
+                iflag=1
+            )
+            
+            if best_neighbor >= 0:
+                neighbor_idx = best_neighbor
+                disold = best_dist
+            else:
+                # Wolf's goto50: replacement failed, break to find new initial neighbor
+                break
+        
+        if iterations >= max_iterations:
+            break
+
+    if iterations == 0:
+        return np.nan
+
+    total_time = iterations * evolve_steps * dt
+    return lyapunov_sum / total_time
+
+
+def lyapunov_wolf_detailed(data: np.ndarray, m: int, tau: int,
+                           dt: float = 1.0,
+                           initial_neighbor_distance: float = None,
+                           replacement_threshold: float = None,
+                           max_iterations: int = None,
+                           min_tsep: int = None,
+                           evolve_steps: int = 1,
+                           min_neighbor_distance: float = None,
+                           replacement_angle_deg: float = 30.0) -> dict:
+    """
+    Same as lyapunov_wolf but returns detailed results including:
+    - le: Lyapunov exponent
+    - std: standard deviation of per-step estimates
+    - convergence: relative change in last 20% of running estimate
+    - le_per_step: array of per-step log(disnew/disold) values
+    - running_le: running Lyapunov estimate at each step
+    """
+    embedded = embed_timeseries(data, m, tau)
+    n_points = len(embedded)
+    
+    nan_result = {'le': np.nan, 'std': np.nan, 'convergence': np.nan,
+                  'le_per_step': np.array([]), 'running_le': np.array([])}
+
+    if n_points <= evolve_steps + 1:
+        return nan_result
+
+    # Wolf's temporal separation: abs(runner - oldpnt) < evolve
+    if min_tsep is None:
+        min_tsep = evolve_steps
+    if max_iterations is None:
+        max_iterations = n_points
+
+    tree = _build_kdtree(embedded)
+
+    if min_neighbor_distance is None or initial_neighbor_distance is None:
+        auto_dismin, auto_dismax = _estimate_distance_params(embedded, tree, min_tsep)
+        if min_neighbor_distance is None:
+            min_neighbor_distance = auto_dismin
+        if initial_neighbor_distance is None:
+            initial_neighbor_distance = auto_dismax
+
+    if replacement_threshold is None:
+        replacement_threshold = initial_neighbor_distance
+
+    n_usable = n_points - evolve_steps - 1
+
+    lyapunov_sum = 0.0
+    iterations = 0
+    current_idx = 0
+    le_per_step = []
+    running_le = []
+
+    while current_idx <= n_usable:
+        search_dismax = initial_neighbor_distance
+        neighbor_idx = -1
+        
+        while neighbor_idx < 0:
+            neighbor_idx, current_dist, _ = _find_neighbor_wolf(
+                embedded, tree, current_idx, min_tsep, evolve_steps,
+                min_neighbor_distance, search_dismax, n_usable, iflag=0
+            )
+            if neighbor_idx < 0:
+                search_dismax *= 2.0
+                if search_dismax > np.std(embedded[:, 0]) * 100:
+                    break
+        
+        if neighbor_idx < 0:
+            current_idx += evolve_steps
+            continue
+
+        disold = current_dist
+
+        while True:
+            current_idx += evolve_steps
+            neighbor_idx += evolve_steps
+            
+            if current_idx > n_usable:
+                break
+            if neighbor_idx >= n_points:
+                current_idx -= evolve_steps
+                break
+            
+            disnew = np.linalg.norm(embedded[current_idx] - embedded[neighbor_idx])
+            
+            # Wolf: SUM = SUM + log(disnew/disold) — no filter (fet.m line 75)
+            if disold > 0 and disnew > 0:
+                log_ratio = np.log(disnew / disold)
+            elif disold > 0:
+                log_ratio = np.log(1e-18 / disold)
+            else:
+                log_ratio = 0.0
+            lyapunov_sum += log_ratio
+            iterations += 1
+            le_per_step.append(log_ratio)
+            total_time = iterations * evolve_steps * dt
+            running_le.append(lyapunov_sum / total_time)
+            
+            if iterations >= max_iterations:
+                break
+            
+            if disnew <= replacement_threshold:
+                disold = disnew
+                continue
+            
+            direction = embedded[current_idx] - embedded[neighbor_idx]
+            best_neighbor, best_dist, _ = _find_neighbor_wolf(
+                embedded, tree, current_idx, min_tsep, evolve_steps,
+                min_neighbor_distance, initial_neighbor_distance, n_usable,
+                direction_vector=direction, oldist=disnew,
+                max_angle_deg=replacement_angle_deg, iflag=1
+            )
+            
+            if best_neighbor >= 0:
+                neighbor_idx = best_neighbor
+                disold = best_dist
+            else:
+                break
+        
+        if iterations >= max_iterations:
+            break
+
+    if iterations == 0:
+        return nan_result
+
+    total_time = iterations * evolve_steps * dt
+    le = lyapunov_sum / total_time
+    
+    le_arr = np.array(le_per_step)
+    running_arr = np.array(running_le)
+    
+    step_le_values = le_arr / (evolve_steps * dt)
+    std = float(np.std(step_le_values))
+    
+    if len(running_arr) >= 10:
+        last_20 = running_arr[int(0.8 * len(running_arr)):]
+        convergence = float(np.std(last_20) / (np.abs(np.mean(last_20)) + 1e-18))
+    else:
+        convergence = np.nan
+    
+    return {
+        'le': le,
+        'std': std,
+        'convergence': convergence,
+        'le_per_step': le_arr,
+        'running_le': running_arr
+    }
+
+
+def lyapunov_rosenstein(data: np.ndarray, m: int, tau: int,
+                        dt: float = 1.0,
+                        min_tsep: int = None, max_lag: int = None,
+                        max_samples: int = 5000) -> tuple:
+    """
+    Estimate largest Lyapunov exponent using Rosenstein's algorithm.
+    
+    Uses KD-Tree for fast nearest neighbor search and sampling for performance.
+
+    Args:
+        data: 1D time series
+        m: embedding dimension
+        tau: time delay
+        dt: time step
+        min_tsep: Theiler window (default: m * tau)
+        max_lag: maximum lag for divergence tracking
+        max_samples: maximum number of fiducial points to sample
+
+    Returns:
+        (time_steps, mean_divergence)
+    """
+    embedded = embed_timeseries(data, m, tau)
+    n_points = len(embedded)
+
+    if min_tsep is None:
+        min_tsep = max(m * tau, 1)
+
+    if max_lag is None:
+        max_lag = min(n_points // 10, 300)
+
+    max_lag = min(max_lag, n_points - 1)
+
+    tree = _build_kdtree(embedded)
+    
+    n_fiducial = min(max_samples, n_points - max_lag)
+    if n_fiducial <= 0:
+        return np.arange(max_lag) * dt, np.full(max_lag, np.nan)
+    
+    if n_fiducial < n_points - max_lag:
+        fiducial_indices = np.linspace(0, n_points - max_lag - 1, n_fiducial, dtype=int)
+    else:
+        fiducial_indices = np.arange(n_points - max_lag)
+
+    divergence_sums = np.zeros(max_lag)
+    divergence_counts = np.zeros(max_lag)
+
+    # Find nearest neighbors for all fiducial points at once
+    # Query enough neighbors to find one outside Theiler window
+    k_query = min(min_tsep + 10, n_points)
+    all_dists, all_idxs = tree.query(embedded[fiducial_indices], k=k_query)
+
+    # Build neighbor index array
+    nn_indices = np.full(len(fiducial_indices), -1, dtype=int)
+    for si, i in enumerate(fiducial_indices):
+        for j in range(k_query):
+            idx = int(all_idxs[si, j])
+            if abs(idx - i) >= min_tsep and idx + max_lag < n_points and all_dists[si, j] > 0:
+                nn_indices[si] = idx
+                break
+    
+    valid_mask = nn_indices >= 0
+    valid_fid = fiducial_indices[valid_mask]
+    valid_nn = nn_indices[valid_mask]
+    
+    if len(valid_fid) == 0:
+        return np.arange(max_lag) * dt, np.full(max_lag, np.nan)
+
+    # Vectorized divergence computation for each lag
+    for k in range(max_lag):
+        fi = valid_fid + k
+        ni = valid_nn + k
+        # Check bounds
+        in_bounds = (fi < n_points) & (ni < n_points)
+        if not np.any(in_bounds):
+            break
+        fi_ok = fi[in_bounds]
+        ni_ok = ni[in_bounds]
+        diffs = embedded[fi_ok] - embedded[ni_ok]
+        dists = np.linalg.norm(diffs, axis=1)
+        pos = dists > 0
+        if np.any(pos):
+            divergence_sums[k] = np.sum(np.log(dists[pos]))
+            divergence_counts[k] = np.sum(pos)
+
+    mean_divergence = np.full(max_lag, np.nan)
+    valid_k = divergence_counts > 0
+    mean_divergence[valid_k] = divergence_sums[valid_k] / divergence_counts[valid_k]
+
+    time_steps = np.arange(max_lag) * dt
+    return time_steps, mean_divergence
+
+
+def estimate_lyapunov_from_curve(time_steps: np.ndarray, divergence: np.ndarray,
+                                 fit_start: int = None, fit_end: int = None,
+                                 auto_fit: bool = True) -> float:
+    """
+    Estimate a Lyapunov exponent from a divergence curve using a linear fit.
+    
+    If auto_fit=True and fit_start/fit_end are not given, automatically finds
+    the most linear region using a sliding window R² maximization.
+    The fit region starts from index 0 (or 1 if index 0 is transient).
+    """
+    valid = ~np.isnan(divergence)
+    time_valid = time_steps[valid]
+    div_valid = divergence[valid]
+
+    if len(time_valid) < 2:
+        return np.nan
+
+    if fit_start is not None or fit_end is not None:
+        if fit_start is None:
+            fit_start = 0
+        if fit_end is None:
+            fit_end = len(time_valid)
+        fit_start = min(fit_start, len(time_valid) - 2)
+        fit_end = min(fit_end, len(time_valid))
+        if fit_end <= fit_start + 1:
+            return np.nan
+        coeffs = np.polyfit(time_valid[fit_start:fit_end], div_valid[fit_start:fit_end], 1)
+        return coeffs[0]
+    
+    if auto_fit and len(time_valid) >= 5:
+        return _auto_fit_linear_region(time_valid, div_valid)[0]
+    
+    coeffs = np.polyfit(time_valid, div_valid, 1)
+    return coeffs[0]
+
+
+def _auto_fit_linear_region(time_valid: np.ndarray, div_valid: np.ndarray) -> tuple:
+    """
+    Find the best linear region in the divergence curve for Lyapunov estimation.
+    
+    Two-phase approach:
+    1. Full curve fit (lag 1 to end). If R² >= 0.98, accept (no saturation).
+    2. Otherwise, detect saturation using rolling slope ratio with adaptive
+       window size, then fit the pre-saturation region.
+    
+    Returns: (slope, r2, start_idx, end_idx)
+    """
+    n = len(time_valid)
+    if n < 5:
+        coeffs = np.polyfit(time_valid, div_valid, 1)
+        return coeffs[0], np.nan, 0, n
+    
+    start_skip = 1 if n > 5 else 0
+    fit_t = time_valid[start_skip:]
+    fit_d = div_valid[start_skip:]
+    n_fit = len(fit_t)
+    
+    if n_fit < 3:
+        coeffs = np.polyfit(time_valid, div_valid, 1)
+        return coeffs[0], np.nan, 0, n
+    
+    # Phase 1: Full curve fit
+    full_c = np.polyfit(fit_t, fit_d, 1)
+    full_f = np.polyval(full_c, fit_t)
+    full_sr = np.sum((fit_d - full_f) ** 2)
+    full_st = np.sum((fit_d - np.mean(fit_d)) ** 2)
+    full_r2 = 1.0 - full_sr / full_st if full_st > 1e-30 else 0.0
+    
+    if full_r2 >= 0.98 and full_c[0] > 0:
+        return full_c[0], float(full_r2), start_skip, n
+    
+    # Phase 2: Rolling slope ratio saturation detection
+    # Initial slope from first few points
+    init_len = max(3, min(5, n_fit // 10 + 3))
+    c_init = np.polyfit(fit_t[:init_len], fit_d[:init_len], 1)
+    initial_slope = c_init[0]
+    
+    if initial_slope <= 0:
+        return full_c[0], float(full_r2), start_skip, n
+    
+    # Rolling window: try small then larger
+    saturation_idx = n_fit
+    win_size = max(3, min(n_fit // 15, 15))
+    
+    for i in range(init_len, n_fit - win_size + 1):
+        local_c = np.polyfit(fit_t[i:i + win_size], fit_d[i:i + win_size], 1)
+        ratio = local_c[0] / initial_slope
+        if ratio < 0.25:
+            saturation_idx = i
+            break
+    
+    saturation_idx = max(saturation_idx, init_len)
+    
+    # Fit pre-saturation region
+    fit_end = min(saturation_idx, n_fit)
+    c = np.polyfit(fit_t[:fit_end], fit_d[:fit_end], 1)
+    f = np.polyval(c, fit_t[:fit_end])
+    sr = np.sum((fit_d[:fit_end] - f) ** 2)
+    st = np.sum((fit_d[:fit_end] - np.mean(fit_d[:fit_end])) ** 2)
+    r2 = 1.0 - sr / st if st > 1e-30 else 0.0
+    
+    if c[0] > 0:
+        return c[0], float(r2), start_skip, start_skip + fit_end
+    
+    return full_c[0], float(full_r2), start_skip, n
+
+
+def estimate_lyapunov_from_curve_detailed(time_steps: np.ndarray, 
+                                           divergence: np.ndarray) -> dict:
+    """
+    Returns detailed fit information including R² value.
+    
+    Returns:
+        dict with keys: 'le', 'r2', 'fit_start', 'fit_end'
+    """
+    valid = ~np.isnan(divergence)
+    time_valid = time_steps[valid]
+    div_valid = divergence[valid]
+
+    if len(time_valid) < 5:
+        le = estimate_lyapunov_from_curve(time_steps, divergence)
+        return {'le': le, 'r2': np.nan, 'fit_start': 0, 'fit_end': len(time_valid)}
+
+    slope, r2, start, end = _auto_fit_linear_region(time_valid, div_valid)
+
+    return {
+        'le': slope,
+        'r2': r2,
+        'fit_start': start,
+        'fit_end': end
+    }
