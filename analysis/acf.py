@@ -23,6 +23,11 @@ def compute_acf(data: np.ndarray, max_lag: int = None) -> np.ndarray:
     
     data = data - np.mean(data)
     c0 = np.dot(data, data) / n
+
+    if c0 <= 1e-30:
+        acf = np.zeros(max_lag + 1)
+        acf[0] = 1.0
+        return acf
     
     acf = np.zeros(max_lag + 1)
     acf[0] = 1.0

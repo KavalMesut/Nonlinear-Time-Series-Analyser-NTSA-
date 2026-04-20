@@ -10,6 +10,7 @@ import numpy as np
 
 from .data_load_panel import DataLoadPanel
 from .data_table_panel import DataTablePanel
+from .preprocessing_panel import PreprocessingPanel
 from .linear_analysis_panel import LinearAnalysisPanel
 from .parameter_estimation_panel import ParameterEstimationPanel
 from .chaos_analysis_panel import ChaosAnalysisPanel
@@ -42,10 +43,11 @@ class ContentPanel(QWidget):
         self.data_load_panel.data_loaded.connect(self.on_data_loaded)
         self.stacked_widget.addWidget(self.data_load_panel)
 
-        # 1 — Preprocessing (placeholder)
-        placeholder2 = QLabel("Step 2: Preprocessing\n\nComing soon...")
-        placeholder2.setAlignment(Qt.AlignCenter)
-        self.stacked_widget.addWidget(placeholder2)
+        # 1 — Preprocessing
+        self.preprocessing_panel = PreprocessingPanel(self.tm)
+        self.preprocessing_panel.plot_requested.connect(self._forward_plot)
+        self.preprocessing_panel.data_preprocessed.connect(self.on_data_preprocessed)
+        self.stacked_widget.addWidget(self.preprocessing_panel)
 
         # 2 — Linear Analysis
         self.linear_analysis_panel = LinearAnalysisPanel(self.tm)
@@ -77,12 +79,9 @@ class ContentPanel(QWidget):
 
         self.vsplitter.addWidget(self.stacked_widget)
 
-        # --- Alt: Veri tablosu (Excel benzeri) ---
+        # Veri tablosunu DataLoadPanel icine gom
         self.data_table = DataTablePanel(self.tm)
-        self.vsplitter.addWidget(self.data_table)
-
-        # Baslangicta tablo kucuk (kontroller %60, tablo %40)
-        self.vsplitter.setSizes([360, 240])
+        self.data_load_panel.set_table_widget(self.data_table)
 
         layout.addWidget(self.vsplitter)
 
@@ -111,6 +110,7 @@ class ContentPanel(QWidget):
 
         self.linear_analysis_panel.set_data(timeseries)
         self.parameter_panel.set_data(timeseries)
+        self.preprocessing_panel.set_data(timeseries)
 
     def on_linear_analysis_complete(self, results):
         main_window = self.window()
@@ -132,6 +132,20 @@ class ContentPanel(QWidget):
         if hasattr(main_window, 'steps_panel'):
             main_window.steps_panel.unlock_step(6)
 
+    def on_data_preprocessed(self, timeseries):
+        """On isleme sonrasi guncellenmis veriyi diger panellere ilet"""
+        self.current_data = timeseries
+        self.data_table.set_data(timeseries)
+        self.linear_analysis_panel.set_data(timeseries)
+        self.parameter_panel.set_data(timeseries)
+        self.chaos_panel.reset_data(timeseries)
+
+        main_window = self.window()
+        if hasattr(main_window, 'steps_panel'):
+            main_window.steps_panel.lock_step(4)
+            main_window.steps_panel.lock_step(5)
+            main_window.steps_panel.lock_step(6)
+
     def set_step(self, step_index):
         self.stacked_widget.setCurrentIndex(step_index)
 
@@ -140,6 +154,7 @@ class ContentPanel(QWidget):
 
     def refresh_ui(self):
         self.data_load_panel.refresh_ui()
+        self.preprocessing_panel.refresh_ui()
         self.linear_analysis_panel.refresh_ui()
         self.parameter_panel.refresh_ui()
         self.chaos_panel.refresh_ui()

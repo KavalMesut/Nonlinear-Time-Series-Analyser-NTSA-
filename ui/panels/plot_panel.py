@@ -52,6 +52,8 @@ class PlotPanel(QWidget):
             self._plot_chaos_spectrum(plot_data)
         elif ptype == 'chaos_correlation':
             self._plot_chaos_correlation(plot_data)
+        elif ptype == 'preprocessing':
+            self._plot_preprocessing(plot_data)
 
     # ------------------------------------------------------------------
     def _plot_timeseries(self, d):
@@ -185,6 +187,23 @@ class PlotPanel(QWidget):
             self.plot_widget.plot(log_r, log_c,
                                   pen=pg.mkPen(color='#859900', width=2),
                                   symbol='o', symbolSize=5)
+
+    def _plot_preprocessing(self, d):
+        self.plot_widget.clear()
+        self.plot_widget.setLogMode(y=False)
+        self.title_label.setText(f"Preprocessing — {d.get('operation', '')}")
+        self.plot_widget.setLabel('left', 'Value')
+        self.plot_widget.setLabel('bottom', 'Time')
+
+        # Orijinal veri (soluk)
+        if d.get('data_original') is not None:
+            self.plot_widget.plot(d['time_original'], d['data_original'],
+                                  pen=pg.mkPen(color='#555555', width=1),
+                                  name='Original')
+        # Islenmis veri
+        self.plot_widget.plot(d['time_processed'], d['data_processed'],
+                              pen=pg.mkPen(color='#0e639c', width=1.5),
+                              name='Processed')
 
     # ------------------------------------------------------------------
     def update_plot_theme(self):

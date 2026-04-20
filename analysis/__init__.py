@@ -11,9 +11,11 @@ from .lyapunov import (
     lyapunov_wolf,
     lyapunov_wolf_detailed,
     lyapunov_rosenstein, 
+    lyapunov_kantz,
     estimate_lyapunov_from_curve,
     estimate_lyapunov_from_curve_detailed,
-    lyapunov_spectrum
+    lyapunov_spectrum,
+    estimate_theiler_window
 )
 from .fractal import (
     correlation_dimension,
@@ -32,9 +34,11 @@ __all__ = [
     'lyapunov_wolf',
     'lyapunov_wolf_detailed',
     'lyapunov_rosenstein',
+    'lyapunov_kantz',
     'estimate_lyapunov_from_curve',
     'estimate_lyapunov_from_curve_detailed',
     'lyapunov_spectrum',
+    'estimate_theiler_window',
     'correlation_dimension',
     'estimate_dimension_from_correlation'
 ]

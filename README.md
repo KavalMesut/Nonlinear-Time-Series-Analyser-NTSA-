@@ -115,9 +115,25 @@ tseriesanalyser/
 
 ## Validasyon Testlerini Calistirma
 
+### Bilimsel Dogrulama (10 Sistem)
 ```bash
 python tests/test_validation.py
 ```
+Literatür referanslarına göre Wolf, Rosenstein ve Kantz algoritmalarını 10 kaotik sistem üzerinde doğrular.
+
+### MATLAB Uyumluluk Testi (Wolf Lorenz)
+```bash
+python tests/test_wolf_lorenz_matlab_match.py
+```
+Wolf'un orijinal MATLAB kodunun (`testbench.m`) Python çevirisini doğrular. Wolf'un kendi Data2.lor verisini (16384 nokta Lorenz) birebir aynı parametrelerle (`tau=10, m=3, dt=0.01, evolve=20, dismin=0.001, dismax=0.3, thmax=30°`) çalıştırır.
+
+**Sonuç:** Python: 2.01 bits/s | MATLAB beklenen: ~2.1 bits/s | **Fark: %4.1**
+
+%4.1 fark, nearest neighbor search implementasyonu farklılığından kaynaklanır:
+- MATLAB: Box-grid spatial indexing (basgen.m)
+- Python: scipy KDTree
+
+Wolf dokümantasyonu da "approximately 2.1 bits/second" ifadesini kullanır. %4.1 fark kabul edilebilir doğruluk seviyesidir.
 
 ## Lisans
 

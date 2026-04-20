@@ -25,11 +25,63 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from .embedding import embed_timeseries
+from .acf import compute_acf
 
 
 def _build_kdtree(embedded: np.ndarray) -> cKDTree:
     """Build a KD-Tree for fast neighbor lookup."""
     return cKDTree(embedded)
+
+
+def estimate_theiler_window(data: np.ndarray, m: int, tau: int,
+                            min_window: int = None,
+                            max_lag: int = None) -> int:
+    """
+    Estimate a temporal separation window from the autocorrelation structure.
+
+    Uses the first informative decorrelation event from the ACF:
+    - first zero crossing, if present
+    - otherwise first lag where ACF drops below 1/e
+    - otherwise first local minimum
+
+    The returned window is always at least `max(1, m*tau)`.
+    """
+    base_window = max(1, m * tau)
+    if min_window is not None:
+        base_window = max(base_window, int(min_window))
+
+    n = len(data)
+    if n < 8:
+        return base_window
+
+    if max_lag is None:
+        max_lag = min(max(base_window * 8, 64), max(2, n // 4))
+    max_lag = min(max_lag, n - 1)
+    if max_lag < 2:
+        return base_window
+
+    acf = compute_acf(data, max_lag=max_lag)
+    if len(acf) < 3:
+        return base_window
+
+    candidate = None
+
+    zero_crossings = np.where(acf[1:] <= 0)[0]
+    if len(zero_crossings) > 0:
+        candidate = int(zero_crossings[0] + 1)
+    else:
+        below_e = np.where(acf[1:] <= np.exp(-1))[0]
+        if len(below_e) > 0:
+            candidate = int(below_e[0] + 1)
+        else:
+            for i in range(1, len(acf) - 1):
+                if acf[i] <= acf[i - 1] and acf[i] <= acf[i + 1]:
+                    candidate = i
+                    break
+
+    if candidate is None:
+        return base_window
+    return max(base_window, int(candidate))
 
 
 def _estimate_distance_params(embedded: np.ndarray, tree: cKDTree,
@@ -59,6 +111,50 @@ def _estimate_distance_params(embedded: np.ndarray, tree: cKDTree,
     dismin = dismax / 100.0
     
     return max(dismin, 1e-12), max(dismax, 1e-8)
+
+
+def _query_valid_neighbors(tree: cKDTree, embedded: np.ndarray,
+                           reference_idx: int, min_tsep: int,
+                           max_lag: int, n_neighbors: int,
+                           initial_k: int = 64,
+                           max_k_cap: int = 4096) -> np.ndarray:
+    """
+    Query valid spatial neighbors while excluding temporally-close samples.
+
+    The query widens progressively until enough valid neighbors are found or
+    a practical cap is reached.
+    """
+    n_points = len(embedded)
+    if n_points <= 1:
+        return np.array([], dtype=int)
+
+    k_query = min(n_points, max(8, initial_k))
+    point = embedded[reference_idx]
+
+    while True:
+        dists, idxs = tree.query(point, k=k_query)
+        dists = np.atleast_1d(dists)
+        idxs = np.atleast_1d(idxs)
+
+        valid = []
+        for idx, dist in zip(idxs, dists):
+            idx = int(idx)
+            if idx == reference_idx:
+                continue
+            if abs(idx - reference_idx) < min_tsep:
+                continue
+            if idx + max_lag >= n_points:
+                continue
+            if dist <= 0:
+                continue
+            valid.append(idx)
+            if len(valid) >= n_neighbors:
+                return np.array(valid, dtype=int)
+
+        if k_query >= n_points or k_query >= max_k_cap:
+            return np.array(valid, dtype=int)
+
+        k_query = min(n_points, max_k_cap, k_query * 2)
 
 
 def _find_neighbor_wolf(embedded: np.ndarray, tree: cKDTree,
@@ -210,8 +306,12 @@ def lyapunov_wolf(data: np.ndarray, m: int, tau: int,
         return np.nan
 
     # Wolf's temporal separation: abs(runner - oldpnt) < evolve (search.m line 101)
+    # For scalar experimental data, a larger Theiler window is often needed to
+    # avoid selecting same-orbit neighbors that bias the exponent upward.
     if min_tsep is None:
-        min_tsep = evolve_steps
+        min_tsep = estimate_theiler_window(
+            data, m, tau, min_window=max(evolve_steps, m * tau)
+        )
 
     if max_iterations is None:
         max_iterations = n_points
@@ -352,7 +452,9 @@ def lyapunov_wolf_detailed(data: np.ndarray, m: int, tau: int,
 
     # Wolf's temporal separation: abs(runner - oldpnt) < evolve
     if min_tsep is None:
-        min_tsep = evolve_steps
+        min_tsep = estimate_theiler_window(
+            data, m, tau, min_window=max(evolve_steps, m * tau)
+        )
     if max_iterations is None:
         max_iterations = n_points
 
@@ -497,7 +599,7 @@ def lyapunov_rosenstein(data: np.ndarray, m: int, tau: int,
     n_points = len(embedded)
 
     if min_tsep is None:
-        min_tsep = max(m * tau, 1)
+        min_tsep = estimate_theiler_window(data, m, tau)
 
     if max_lag is None:
         max_lag = min(n_points // 10, 300)
@@ -520,7 +622,7 @@ def lyapunov_rosenstein(data: np.ndarray, m: int, tau: int,
 
     # Find nearest neighbors for all fiducial points at once
     # Query enough neighbors to find one outside Theiler window
-    k_query = min(min_tsep + 10, n_points)
+    k_query = min(max(32, 2 * min_tsep + 20), n_points)
     all_dists, all_idxs = tree.query(embedded[fiducial_indices], k=k_query)
 
     # Build neighbor index array
@@ -529,6 +631,18 @@ def lyapunov_rosenstein(data: np.ndarray, m: int, tau: int,
         for j in range(k_query):
             idx = int(all_idxs[si, j])
             if abs(idx - i) >= min_tsep and idx + max_lag < n_points and all_dists[si, j] > 0:
+                nn_indices[si] = idx
+                break
+
+        if nn_indices[si] >= 0:
+            continue
+
+        # Fallback: search the full tree if the bounded query did not find a valid
+        # neighbor outside the Theiler window.
+        dists_full, idxs_full = tree.query(embedded[i], k=n_points)
+        for idx, dist in zip(np.atleast_1d(idxs_full), np.atleast_1d(dists_full)):
+            idx = int(idx)
+            if abs(idx - i) >= min_tsep and idx + max_lag < n_points and dist > 0:
                 nn_indices[si] = idx
                 break
     
@@ -555,6 +669,81 @@ def lyapunov_rosenstein(data: np.ndarray, m: int, tau: int,
         if np.any(pos):
             divergence_sums[k] = np.sum(np.log(dists[pos]))
             divergence_counts[k] = np.sum(pos)
+
+    mean_divergence = np.full(max_lag, np.nan)
+    valid_k = divergence_counts > 0
+    mean_divergence[valid_k] = divergence_sums[valid_k] / divergence_counts[valid_k]
+
+    time_steps = np.arange(max_lag) * dt
+    return time_steps, mean_divergence
+
+
+def lyapunov_kantz(data: np.ndarray, m: int, tau: int,
+                   dt: float = 1.0,
+                   min_tsep: int = None, max_lag: int = None,
+                   max_samples: int = 1000, n_neighbors: int = 20,
+                   min_neighbors: int = 5) -> tuple:
+    """
+    Estimate largest Lyapunov exponent using Kantz's divergence method.
+
+    Returns the average log-divergence curve; slope fitting is handled by the
+    same helper used for Rosenstein.
+    """
+    embedded = embed_timeseries(data, m, tau)
+    n_points = len(embedded)
+
+    if min_tsep is None:
+        min_tsep = estimate_theiler_window(data, m, tau)
+
+    if max_lag is None:
+        max_lag = min(n_points // 10, 300)
+    max_lag = min(max_lag, n_points - 1)
+
+    if n_points <= 2 or max_lag <= 1:
+        return np.arange(max_lag) * dt, np.full(max_lag, np.nan)
+
+    tree = _build_kdtree(embedded)
+
+    n_fiducial = min(max_samples, n_points - max_lag)
+    if n_fiducial <= 0:
+        return np.arange(max_lag) * dt, np.full(max_lag, np.nan)
+
+    if n_fiducial < n_points - max_lag:
+        fiducial_indices = np.linspace(0, n_points - max_lag - 1, n_fiducial, dtype=int)
+    else:
+        fiducial_indices = np.arange(n_points - max_lag)
+
+    neighbor_sets = []
+    valid_fiducials = []
+    for idx in fiducial_indices:
+        neighbors = _query_valid_neighbors(
+            tree, embedded, int(idx), min_tsep, max_lag, n_neighbors
+        )
+        if len(neighbors) >= min_neighbors:
+            valid_fiducials.append(int(idx))
+            neighbor_sets.append(neighbors)
+
+    if not valid_fiducials:
+        return np.arange(max_lag) * dt, np.full(max_lag, np.nan)
+
+    divergence_sums = np.zeros(max_lag)
+    divergence_counts = np.zeros(max_lag)
+
+    for fiducial_idx, neighbors in zip(valid_fiducials, neighbor_sets):
+        for k in range(max_lag):
+            fi = fiducial_idx + k
+            ni = neighbors + k
+            in_bounds = (fi < n_points) & (ni < n_points)
+            if not np.any(in_bounds):
+                break
+            ni_ok = ni[in_bounds]
+            diffs = embedded[fi] - embedded[ni_ok]
+            dists = np.linalg.norm(diffs, axis=1)
+            pos = dists > 0
+            if np.any(pos):
+                logs = np.log(dists[pos])
+                divergence_sums[k] += np.sum(logs)
+                divergence_counts[k] += len(logs)
 
     mean_divergence = np.full(max_lag, np.nan)
     valid_k = divergence_counts > 0

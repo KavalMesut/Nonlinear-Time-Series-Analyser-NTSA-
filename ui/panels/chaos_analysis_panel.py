@@ -188,6 +188,24 @@ class ChaosAnalysisPanel(QWidget):
         self.calc_lyap_button.setEnabled(True)
         self.calc_corr_button.setEnabled(True)
         self.calc_spec_button.setEnabled(True)
+
+    def reset_data(self, timeseries=None):
+        """Clear cached parameters and results when the source series changes."""
+        self.current_data = timeseries
+        self.tau = None
+        self.m = None
+        self.tau_label.setText("τ = ?")
+        self.m_label.setText("m = ?")
+        self.lyap_result_label.setText("λ = ?")
+        self.lyap_info.clear()
+        self.spec_result_label.setText("λ₁, λ₂, ... = ?")
+        self.spec_info.clear()
+        self.corr_result_label.setText("D₂ = ?")
+        self.status_label.setText("")
+        self.progress.setVisible(False)
+        self.calc_lyap_button.setEnabled(False)
+        self.calc_corr_button.setEnabled(False)
+        self.calc_spec_button.setEnabled(False)
     
     def calculate_lyapunov(self):
         if not self._check_ready():

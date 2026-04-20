@@ -126,7 +126,12 @@ class ParameterEstimationPanel(QWidget):
     
     def set_data(self, timeseries):
         self.current_data = timeseries
+        self.tau = None
+        self.m = None
+        self.tau_result_label.setText("τ = ?")
+        self.m_result_label.setText("m = ?")
         self.estimate_tau_button.setEnabled(True)
+        self.estimate_m_button.setEnabled(False)
     
     def estimate_tau(self):
         if self.current_data is None:
