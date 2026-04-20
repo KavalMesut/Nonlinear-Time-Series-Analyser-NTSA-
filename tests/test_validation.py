@@ -242,7 +242,7 @@ def run_validation():
     out(f"  S = stabil (CV<0.20), U = unstabil (CV>=0.20).")
     
     # test_sonuc.txt dosyasina kaydet
-    output_path = os.path.join(os.path.dirname(__file__), '..', 'test_sonuc.txt')
+    output_path = os.path.join(os.path.dirname(__file__), 'test_sonuc.txt')
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines) + '\n')
     print(f"\nSonuclar kaydedildi: {os.path.abspath(output_path)}")
