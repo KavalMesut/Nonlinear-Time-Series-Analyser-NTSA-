@@ -711,3 +711,225 @@ def estimate_lyapunov_from_curve_detailed(time_steps: np.ndarray,
         'fit_start': start,
         'fit_end': end
     }
+
+
+# =====================================================================
+# FULL LYAPUNOV SPECTRUM — Benettin (1980) / Eckmann-Ruelle yontemi
+# Zaman serisinden Jacobian tahmini + QR dekompozisyon ile
+# tum m adet Lyapunov ustelini hesaplar.
+# =====================================================================
+
+def _estimate_jacobian(embedded: np.ndarray, tree: cKDTree,
+                       idx: int, m: int, k_neighbors: int = None,
+                       min_tsep: int = 1) -> np.ndarray:
+    """
+    Lokal Jacobian tahmini (en kucuk kareler ile).
+    
+    x(n+1) - x_ref(n+1) ≈ J * (x(n) - x_ref(n))
+    
+    Args:
+        embedded: gomulu faz uzayi dizisi
+        tree: KD-Tree
+        idx: referans nokta indeksi
+        m: gomme boyutu
+        k_neighbors: komsu sayisi (varsayilan: 2*m+1)
+        min_tsep: minimum zamansal ayrim
+    
+    Returns:
+        m x m Jacobian matrisi
+    """
+    n_points = len(embedded)
+    if k_neighbors is None:
+        k_neighbors = max(2 * m + 1, m + 5)
+    
+    # idx+1 sinir kontrolu
+    if idx + 1 >= n_points:
+        return np.eye(m)
+    
+    # Yeterli komsu bul
+    k_query = min(k_neighbors + min_tsep + 5, n_points)
+    dists, idxs = tree.query(embedded[idx], k=k_query)
+    
+    # Filtrele: zamansal ayrim ve idx+1 siniri
+    valid = []
+    for j in range(len(idxs)):
+        ni = int(idxs[j])
+        if ni == idx:
+            continue
+        if abs(ni - idx) < min_tsep:
+            continue
+        if ni + 1 >= n_points:
+            continue
+        if dists[j] < 1e-15:
+            continue
+        valid.append(ni)
+        if len(valid) >= k_neighbors:
+            break
+    
+    if len(valid) < m:
+        return np.eye(m)
+    
+    # dx(n) = x_neighbor(n) - x_ref(n)
+    # dx(n+1) = x_neighbor(n+1) - x_ref(n+1)
+    # dx(n+1) ≈ J * dx(n)  →  en kucuk kareler
+    valid = np.array(valid)
+    dx = embedded[valid] - embedded[idx]          # (k, m)
+    dx_next = embedded[valid + 1] - embedded[idx + 1]  # (k, m)
+    
+    # J = dx_next^T * dx * (dx^T * dx)^{-1}  →  lstsq: dx @ J^T = dx_next
+    # Her sutun icin: dx @ j_col = dx_next[:, col]
+    try:
+        J_T, _, _, _ = np.linalg.lstsq(dx, dx_next, rcond=None)
+        return J_T.T  # (m, m)
+    except np.linalg.LinAlgError:
+        return np.eye(m)
+
+
+def lyapunov_spectrum(data: np.ndarray, m: int, tau: int,
+                      dt: float = 1.0,
+                      n_exponents: int = None,
+                      min_tsep: int = None,
+                      transient_frac: float = 0.05,
+                      k_neighbors: int = None) -> dict:
+    """
+    Full Lyapunov spektrumu hesaplama — Benettin (1980) yontemi.
+    
+    Zaman serisinden lokal Jacobian tahmini ve QR dekompozisyon ile
+    tum m adet Lyapunov ustelini hesaplar.
+    
+    Args:
+        data: 1D zaman serisi
+        m: gomme boyutu (embedding dimension)
+        tau: zaman gecikmesi
+        dt: ornekleme araligi
+        n_exponents: hesaplanacak ustel sayisi (varsayilan: m)
+        min_tsep: minimum zamansal ayrim (Theiler penceresi)
+        transient_frac: ilk transient kismi (0-1 arasi, atlanacak)
+        k_neighbors: Jacobian tahmini icin komsu sayisi
+    
+    Returns:
+        dict:
+            'exponents': m adet Lyapunov usteli (buyukten kucuge siralanmis, nats/zaman)
+            'exponents_convergence': her adimda guncel ustel tahminleri (n_steps x m)
+            'kaplan_yorke_dim': Kaplan-Yorke boyutu
+            'kolmogorov_sinai': Kolmogorov-Sinai entropi tahmini (pozitif usteller toplami)
+            'n_steps': kullanilan adim sayisi
+    """
+    from .embedding import embed_timeseries
+    
+    embedded = embed_timeseries(data, m, tau)
+    n_points = len(embedded)
+    
+    if n_exponents is None:
+        n_exponents = m
+    n_exponents = min(n_exponents, m)
+    
+    if min_tsep is None:
+        min_tsep = max(m * tau, 1)
+    
+    tree = _build_kdtree(embedded)
+    
+    # Transient atlama
+    start_idx = max(1, int(n_points * transient_frac))
+    end_idx = n_points - 2  # idx+1 icin yer birak
+    
+    if end_idx <= start_idx:
+        return {'exponents': np.full(n_exponents, np.nan),
+                'exponents_convergence': np.array([]),
+                'kaplan_yorke_dim': np.nan,
+                'kolmogorov_sinai': np.nan,
+                'n_steps': 0}
+    
+    # QR yontemi: Q matrisi ortogonal yonleri takip eder
+    Q = np.eye(m, n_exponents)  # m x n_exponents
+    lyap_sums = np.zeros(n_exponents)
+    n_steps = 0
+    convergence = []
+    
+    for idx in range(start_idx, end_idx):
+        # Lokal Jacobian tahmini
+        J = _estimate_jacobian(embedded, tree, idx, m,
+                               k_neighbors=k_neighbors, min_tsep=min_tsep)
+        
+        # Q'yu Jacobian ile ilerlet: Q_new = J @ Q
+        Q_new = J @ Q
+        
+        # QR dekompozisyon (Gram-Schmidt)
+        Q_new, R = np.linalg.qr(Q_new, mode='reduced')
+        
+        # R'nin kosegen elemanlari buyume oranlarini verir
+        diag = np.abs(np.diag(R))
+        # Sifir veya negatif degerlerden kacin
+        diag = np.maximum(diag, 1e-300)
+        lyap_sums += np.log(diag[:n_exponents])
+        n_steps += 1
+        
+        Q = Q_new
+        
+        # Her 100 adimda konverjans kaydi
+        if n_steps % 100 == 0:
+            current_exp = lyap_sums / (n_steps * dt)
+            convergence.append(current_exp.copy())
+    
+    if n_steps == 0:
+        return {'exponents': np.full(n_exponents, np.nan),
+                'exponents_convergence': np.array([]),
+                'kaplan_yorke_dim': np.nan,
+                'kolmogorov_sinai': np.nan,
+                'n_steps': 0}
+    
+    exponents = lyap_sums / (n_steps * dt)
+    
+    # Buyukten kucuge sirala
+    sort_idx = np.argsort(exponents)[::-1]
+    exponents = exponents[sort_idx]
+    
+    # Kaplan-Yorke boyutu
+    ky_dim = _kaplan_yorke_dimension(exponents)
+    
+    # Kolmogorov-Sinai entropi (pozitif usteller toplami)
+    ks_entropy = float(np.sum(exponents[exponents > 0]))
+    
+    conv_arr = np.array(convergence) if convergence else np.array([])
+    
+    return {
+        'exponents': exponents,
+        'exponents_convergence': conv_arr,
+        'kaplan_yorke_dim': ky_dim,
+        'kolmogorov_sinai': ks_entropy,
+        'n_steps': n_steps
+    }
+
+
+def _kaplan_yorke_dimension(exponents: np.ndarray) -> float:
+    """
+    Kaplan-Yorke boyutu hesapla.
+    
+    D_KY = j + (sum_{i=1}^{j} lambda_i) / |lambda_{j+1}|
+    
+    j: kumulatif toplamin hala pozitif oldugu en buyuk indeks.
+    """
+    n = len(exponents)
+    if n == 0 or exponents[0] <= 0:
+        return 0.0
+    
+    cumsum = np.cumsum(exponents)
+    
+    # j: cumsum[j] >= 0 olan en buyuk indeks
+    j = -1
+    for i in range(n):
+        if cumsum[i] >= 0:
+            j = i
+        else:
+            break
+    
+    if j < 0:
+        return 0.0
+    if j >= n - 1:
+        return float(n)
+    
+    # D_KY = (j+1) + cumsum[j] / |exponents[j+1]|
+    if abs(exponents[j + 1]) < 1e-15:
+        return float(j + 1)
+    
+    return float(j + 1) + cumsum[j] / abs(exponents[j + 1])
