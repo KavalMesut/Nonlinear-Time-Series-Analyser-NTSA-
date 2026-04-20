@@ -146,6 +146,17 @@ def generate_duffing(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 50
     return integrate_ode(f, y0, t_span, dt, system_name="duffing")
 
 
+def generate_double_pendulum(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 200),
+                             dt: float = 0.01, m1: float = 1.0, m2: float = 1.0,
+                             l1: float = 1.0, l2: float = 1.0, g: float = 9.81) -> TimeSeries:
+    """Cift sarkac zaman serisi (kaotik rejim: theta1=theta2=pi/2, LE~0.5)"""
+    from .integrators import integrate_ode, double_pendulum_system
+    if y0 is None:
+        y0 = np.array([np.pi / 2, np.pi / 2, 0.0, 0.0])
+    f = double_pendulum_system(m1=m1, m2=m2, l1=l1, l2=l2, g=g)
+    return integrate_ode(f, y0, t_span, dt, system_name="double_pendulum")
+
+
 def tent_map(mu: float = 2.0, x0: float = 0.501, n: int = 1000) -> TimeSeries:
     """Generate Tent map time series.
     

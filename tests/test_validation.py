@@ -1,6 +1,6 @@
 """
-Validation tests for 10 chaotic systems.
-5 Continuous ODE Systems, 5 Discrete Maps.
+Validation tests for 11 chaotic systems.
+6 Continuous ODE Systems, 5 Discrete Maps.
 
 Her iki algoritma (Wolf ve Rosenstein) bagimsiz olarak test edilir,
 sonuclar tek tabloda yan yana sunulur. Hangisinin kullanilacagi
@@ -24,6 +24,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core import (
     generate_lorenz, generate_rossler, generate_chua, generate_chen, generate_duffing,
+    generate_double_pendulum,
     logistic_map, henon_map, tent_map, sine_map, ikeda_map
 )
 from analysis import (
@@ -75,7 +76,7 @@ def compute_le_stability(data, m, tau, dt, method='rosenstein', evolve_steps=1):
 
 def run_validation():
     print("\n" + "=" * 110)
-    print("NONLINEAR TIME SERIES ANALYZER - 10 SYSTEM VALIDATION")
+    print("NONLINEAR TIME SERIES ANALYZER - 11 SYSTEM VALIDATION")
     print("=" * 110)
     
     total_start = time.time()
@@ -88,6 +89,7 @@ def run_validation():
         ("Chua",     generate_chua,    0.33,   0.1,  1,  False, {'t_span': (0, 2000)}),
         ("Chen",     generate_chen,    2.027,  0.01, 5,  False, {}),
         ("Duffing",  generate_duffing, 0.16,   0.1,  1,  False, {'t_span': (0, 6000), 'gamma': 0.5, 'transient': 5000}),
+        ("DoublePen", generate_double_pendulum, 0.5, 0.01, 5, False, {'t_span': (0, 500), 'transient': 2000}),
         ("Logistic", logistic_map,     np.log(2), 1.0, 1, True, {}),
         ("Henon",    henon_map,        0.4200, 1.0,  1,  True, {}),
         ("Tent",     tent_map,         np.log(2), 1.0, 1, True, {}),
@@ -226,11 +228,12 @@ def run_validation():
     out(f"\n{'='*60}")
     out("STATISTICS")
     out(f"{'='*60}")
-    out(f"Wolf   (<10% error): {wolf_under10}/10")
-    out(f"Wolf   (<20% error): {wolf_under20}/10")
-    out(f"Rosenstein (<10%):   {ros_under10}/10")
-    out(f"Rosenstein (<20%):   {ros_under20}/10")
-    out(f"LE Stability (CV<0.20): {stable_count}/10")
+    n_sys = len(summary)
+    out(f"Wolf   (<10% error): {wolf_under10}/{n_sys}")
+    out(f"Wolf   (<20% error): {wolf_under20}/{n_sys}")
+    out(f"Rosenstein (<10%):   {ros_under10}/{n_sys}")
+    out(f"Rosenstein (<20%):   {ros_under20}/{n_sys}")
+    out(f"LE Stability (CV<0.20): {stable_count}/{n_sys}")
     out(f"Total time: {total_elapsed:.1f}s")
     out(f"{'='*60}")
     

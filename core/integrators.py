@@ -152,3 +152,33 @@ def duffing_system(alpha: float = -1.0, beta: float = 1.0,
         ])
     return f
 
+
+def double_pendulum_system(m1: float = 1.0, m2: float = 1.0,
+                           l1: float = 1.0, l2: float = 1.0,
+                           g: float = 9.81):
+    """
+    Cift sarkac sistemi.
+    
+    Durum vektoru: [theta1, theta2, omega1, omega2]
+    theta1, theta2: aclar (rad)
+    omega1, omega2: acisal hizlar (rad/s)
+    """
+    def f(t: float, y: np.ndarray) -> np.ndarray:
+        th1, th2, w1, w2 = y
+        delta_th = th1 - th2
+        den1 = (m1 + m2) * l1 - m2 * l1 * np.cos(delta_th)**2
+        den2 = (l2 / l1) * den1
+
+        dw1 = (m2 * l1 * w1**2 * np.sin(delta_th) * np.cos(delta_th)
+               + m2 * g * np.sin(th2) * np.cos(delta_th)
+               + m2 * l2 * w2**2 * np.sin(delta_th)
+               - (m1 + m2) * g * np.sin(th1)) / den1
+
+        dw2 = (-m2 * l2 * w2**2 * np.sin(delta_th) * np.cos(delta_th)
+               + (m1 + m2) * g * np.sin(th1) * np.cos(delta_th)
+               - (m1 + m2) * l1 * w1**2 * np.sin(delta_th)
+               - (m1 + m2) * g * np.sin(th2)) / den2
+
+        return np.array([w1, w2, dw1, dw2])
+    return f
+
