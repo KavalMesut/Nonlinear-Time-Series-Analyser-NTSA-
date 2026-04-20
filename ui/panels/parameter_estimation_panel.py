@@ -1,13 +1,12 @@
 """
-Parameter estimation panel (AMI for tau, FNN for m)
+Parameter estimation panel (AMI for tau, FNN for m) — sadece kontroller, grafik PlotPanel'de.
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QGroupBox, QLabel, QSpinBox, QFormLayout,
-    QProgressBar, QTextEdit
+    QProgressBar
 )
 from PySide6.QtCore import Qt, Signal, QThread
-import pyqtgraph as pg
 import numpy as np
 
 
@@ -23,7 +22,6 @@ class ParameterWorker(QThread):
         self.params = params
     
     def run(self):
-        """Run parameter estimation"""
         try:
             from analysis import (
                 compute_ami, find_first_minimum,
@@ -36,7 +34,6 @@ class ParameterWorker(QThread):
                 max_lag = self.params.get('max_lag', 100)
                 ami = compute_ami(self.data, max_lag=max_lag)
                 tau = find_first_minimum(ami)
-                
                 results['ami'] = ami
                 results['lags'] = np.arange(1, len(ami) + 1)
                 results['tau'] = tau
@@ -44,26 +41,24 @@ class ParameterWorker(QThread):
             elif self.estimation_type == 'm':
                 tau = self.params.get('tau', 1)
                 max_dim = self.params.get('max_dim', 10)
-                
                 fnn = compute_fnn(self.data, tau=tau, max_dim=max_dim)
                 m = find_embedding_dimension(fnn, threshold=1.0)
-                
                 results['fnn'] = fnn
                 results['dimensions'] = np.arange(1, len(fnn) + 1)
                 results['m'] = m
             
             self.finished.emit(results)
-        
         except Exception as e:
             self.error.emit(str(e))
 
 
 class ParameterEstimationPanel(QWidget):
-    """Parameter estimation panel"""
+    """Parameter estimation panel — sadece kontroller"""
     
     parameters_estimated = Signal(dict)
+    plot_requested = Signal(dict)
     
-    def __init__(self, translation_manager, theme_manager):
+    def __init__(self, translation_manager, theme_manager=None):
         super().__init__()
         self.tm = translation_manager
         self.theme_manager = theme_manager
@@ -74,7 +69,6 @@ class ParameterEstimationPanel(QWidget):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize UI"""
         layout = QVBoxLayout(self)
         
         # Tau estimation
@@ -123,130 +117,77 @@ class ParameterEstimationPanel(QWidget):
         m_group.setLayout(m_layout)
         layout.addWidget(m_group)
         
-        # Progress bar
+        # Progress
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         layout.addWidget(self.progress)
         
-        # Plot widget
-        self.plot_widget = pg.PlotWidget()
-        self.update_plot_theme()
-        self.plot_widget.setLabel('left', 'AMI')
-        self.plot_widget.setLabel('bottom', 'Lag')
-        self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        layout.addWidget(self.plot_widget)
+        layout.addStretch()
     
     def set_data(self, timeseries):
-        """Set data for parameter estimation"""
         self.current_data = timeseries
         self.estimate_tau_button.setEnabled(True)
     
     def estimate_tau(self):
-        """Estimate tau using AMI"""
         if self.current_data is None:
             return
-        
         params = {'max_lag': self.tau_max_lag_spin.value()}
-        
         self.worker = ParameterWorker(self.current_data.data, 'tau', params)
         self.worker.finished.connect(self.on_tau_estimated)
         self.worker.error.connect(self.on_error)
-        
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
         self.estimate_tau_button.setEnabled(False)
-        
         self.worker.start()
     
     def estimate_m(self):
-        """Estimate m using FNN"""
         if self.current_data is None or self.tau is None:
             return
-        
-        params = {
-            'tau': self.tau,
-            'max_dim': self.m_max_dim_spin.value()
-        }
-        
+        params = {'tau': self.tau, 'max_dim': self.m_max_dim_spin.value()}
         self.worker = ParameterWorker(self.current_data.data, 'm', params)
         self.worker.finished.connect(self.on_m_estimated)
         self.worker.error.connect(self.on_error)
-        
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
         self.estimate_m_button.setEnabled(False)
-        
         self.worker.start()
     
     def on_tau_estimated(self, results):
-        """Handle tau estimation completion"""
         self.progress.setVisible(False)
         self.estimate_tau_button.setEnabled(True)
-        
         self.tau = results['tau']
         self.tau_result_label.setText(f"τ = {self.tau}")
-        
-        # Plot AMI
-        self.plot_widget.clear()
-        self.plot_widget.setLabel('left', 'AMI')
-        self.plot_widget.setLabel('bottom', 'Lag')
-        self.plot_widget.plot(results['lags'], results['ami'],
-                            pen=pg.mkPen(color='#268bd2', width=2))
-        
-        # Mark first minimum
-        ami_values = results['ami']
-        self.plot_widget.plot([self.tau], [ami_values[self.tau-1]],
-                            pen=None, symbol='o', symbolSize=10,
-                            symbolBrush='red')
-        
-        # Enable m estimation
         self.estimate_m_button.setEnabled(True)
+        
+        self.plot_requested.emit({
+            'type': 'param_tau',
+            'results': results
+        })
         
         self.parameters_estimated.emit({'tau': self.tau})
     
     def on_m_estimated(self, results):
-        """Handle m estimation completion"""
         self.progress.setVisible(False)
         self.estimate_m_button.setEnabled(True)
-        
         self.m = results['m']
         self.m_result_label.setText(f"m = {self.m}")
         
-        # Plot FNN
-        self.plot_widget.clear()
-        self.plot_widget.setLabel('left', 'FNN %')
-        self.plot_widget.setLabel('bottom', 'Dimension')
-        self.plot_widget.plot(results['dimensions'], results['fnn'],
-                            pen=pg.mkPen(color='#859900', width=2))
-        
-        # Mark threshold
-        self.plot_widget.plot(results['dimensions'], [1.0] * len(results['dimensions']),
-                            pen=pg.mkPen(color='red', style=Qt.DashLine))
+        self.plot_requested.emit({
+            'type': 'param_m',
+            'results': results
+        })
         
         self.parameters_estimated.emit({'tau': self.tau, 'm': self.m})
     
     def on_error(self, error_msg):
-        """Handle error"""
         self.progress.setVisible(False)
         self.estimate_tau_button.setEnabled(True)
         self.estimate_m_button.setEnabled(True)
         print(f"Parameter estimation error: {error_msg}")
     
-    def update_plot_theme(self):
-        """Update plot theme"""
-        theme = self.theme_manager.get_theme()
-        self.plot_widget.setBackground(theme.colors['plot_bg'])
-        
-        for axis in ['left', 'bottom', 'right', 'top']:
-            ax = self.plot_widget.getAxis(axis)
-            ax.setPen(pg.mkPen(color=theme.colors['plot_text'], width=1))
-            ax.setTextPen(pg.mkPen(color=theme.colors['plot_text']))
-    
     def get_parameters(self):
-        """Get estimated parameters"""
         return {'tau': self.tau, 'm': self.m}
     
     def refresh_ui(self):
-        """Refresh UI with current language"""
         self.estimate_tau_button.setText(self.tm('btn_calculate') + ' τ')
         self.estimate_m_button.setText(self.tm('btn_calculate') + ' m')

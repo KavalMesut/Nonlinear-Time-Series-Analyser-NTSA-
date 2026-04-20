@@ -1,5 +1,6 @@
 """
-Chaos analysis panel (Lyapunov, Correlation Dimension)
+Chaos analysis panel (Lyapunov, Correlation Dimension, Lyapunov Spectrum)
+Sadece kontroller — grafik PlotPanel'de gosterilir.
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -7,7 +8,6 @@ from PySide6.QtWidgets import (
     QFormLayout, QProgressBar, QTextEdit, QComboBox
 )
 from PySide6.QtCore import Qt, Signal, QThread
-import pyqtgraph as pg
 import numpy as np
 
 
@@ -27,10 +27,9 @@ class ChaosWorker(QThread):
         self.dt = dt
     
     def run(self):
-        """Run chaos analysis"""
         try:
             from analysis import (
-                lyapunov_wolf, lyapunov_rosenstein, 
+                lyapunov_wolf, lyapunov_rosenstein,
                 estimate_lyapunov_from_curve, correlation_dimension,
                 lyapunov_spectrum
             )
@@ -46,11 +45,8 @@ class ChaosWorker(QThread):
                 else:
                     self.progress.emit("Calculating Lyapunov exponent (Rosenstein algorithm)...")
                     t_steps, divergence = lyapunov_rosenstein(self.data, m=self.m, tau=self.tau, dt=self.dt)
-                    
-                    # Estimate dimension from curve (initial linear part)
                     fit_end = min(30, len(t_steps))
                     lyap = estimate_lyapunov_from_curve(t_steps, divergence, fit_start=0, fit_end=fit_end)
-                    
                     results['lyapunov'] = lyap
                     results['t_steps'] = t_steps
                     results['divergence'] = divergence
@@ -64,32 +60,28 @@ class ChaosWorker(QThread):
             elif self.analysis_type == 'correlation_dim':
                 self.progress.emit("Calculating correlation dimension...")
                 radii, c_r = correlation_dimension(self.data, m=self.m, tau=self.tau, n_radii=30)
-                
-                # Estimate dimension
                 from analysis import estimate_dimension_from_correlation
                 valid = c_r > 0
                 if np.sum(valid) > 2:
-                    dim = estimate_dimension_from_correlation(radii, c_r, 
-                                                             fit_start=5, fit_end=20)
+                    dim = estimate_dimension_from_correlation(radii, c_r, fit_start=5, fit_end=20)
                     results['dimension'] = dim
                 else:
                     results['dimension'] = np.nan
-                
                 results['radii'] = radii
                 results['c_r'] = c_r
             
             self.finished.emit(results)
-        
         except Exception as e:
             self.error.emit(str(e))
 
 
 class ChaosAnalysisPanel(QWidget):
-    """Chaos analysis panel"""
+    """Chaos analysis panel — sadece kontroller"""
     
     analysis_complete = Signal(dict)
+    plot_requested = Signal(dict)
     
-    def __init__(self, translation_manager, theme_manager):
+    def __init__(self, translation_manager, theme_manager=None):
         super().__init__()
         self.tm = translation_manager
         self.theme_manager = theme_manager
@@ -100,10 +92,9 @@ class ChaosAnalysisPanel(QWidget):
         self.init_ui()
     
     def init_ui(self):
-        """Initialize UI"""
         layout = QVBoxLayout(self)
         
-        # Parameters display
+        # Parameters
         params_group = QGroupBox("Parameters")
         params_layout = QFormLayout()
         self.tau_label = QLabel("τ = ?")
@@ -159,13 +150,6 @@ class ChaosAnalysisPanel(QWidget):
         self.spec_info.setMaximumHeight(120)
         spec_layout.addWidget(self.spec_info)
         
-        self.spec_plot = pg.PlotWidget()
-        self.spec_plot.setMaximumHeight(200)
-        self.spec_plot.showGrid(x=True, y=True, alpha=0.3)
-        self.spec_plot.setLabel('left', 'λ (nats/s)')
-        self.spec_plot.setLabel('bottom', 'Exponent Index')
-        spec_layout.addWidget(self.spec_plot)
-        
         spec_group.setLayout(spec_layout)
         layout.addWidget(spec_group)
         
@@ -193,71 +177,37 @@ class ChaosAnalysisPanel(QWidget):
         self.status_label = QLabel("")
         layout.addWidget(self.status_label)
         
-        # Plot widget
-        self.plot_widget = pg.PlotWidget()
-        self.update_plot_theme()
-        self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        layout.addWidget(self.plot_widget)
+        layout.addStretch()
     
     def set_data(self, timeseries, tau, m):
-        """Set data and parameters"""
         self.current_data = timeseries
         self.tau = tau
         self.m = m
-        
         self.tau_label.setText(f"τ = {tau}")
         self.m_label.setText(f"m = {m}")
-        
         self.calc_lyap_button.setEnabled(True)
         self.calc_corr_button.setEnabled(True)
         self.calc_spec_button.setEnabled(True)
     
     def calculate_lyapunov(self):
-        """Calculate Lyapunov exponent"""
         if not self._check_ready():
             return
-        
         algo = self.algo_combo.currentData()
-        
         self.worker = ChaosWorker(
-            self.current_data.data,
-            self.tau,
-            self.m,
-            'lyapunov',
-            algorithm=algo,
-            dt=self.current_data.dt,
+            self.current_data.data, self.tau, self.m,
+            'lyapunov', algorithm=algo, dt=self.current_data.dt
         )
         self.worker.finished.connect(self.on_lyapunov_complete)
         self.worker.error.connect(self.on_error)
         self.worker.progress.connect(self.on_progress)
-        
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
         self.calc_lyap_button.setEnabled(False)
-        
-        self.worker.start()
-    
-    def calculate_correlation_dim(self):
-        """Calculate correlation dimension"""
-        if not self._check_ready():
-            return
-        
-        self.worker = ChaosWorker(self.current_data.data, self.tau, self.m, 'correlation_dim')
-        self.worker.finished.connect(self.on_correlation_complete)
-        self.worker.error.connect(self.on_error)
-        self.worker.progress.connect(self.on_progress)
-        
-        self.progress.setVisible(True)
-        self.progress.setRange(0, 0)
-        self.calc_corr_button.setEnabled(False)
-        
         self.worker.start()
     
     def calculate_spectrum(self):
-        """Calculate full Lyapunov spectrum"""
         if not self._check_ready():
             return
-        
         self.worker = ChaosWorker(
             self.current_data.data, self.tau, self.m,
             'spectrum', dt=self.current_data.dt
@@ -265,15 +215,24 @@ class ChaosAnalysisPanel(QWidget):
         self.worker.finished.connect(self.on_spectrum_complete)
         self.worker.error.connect(self.on_error)
         self.worker.progress.connect(self.on_progress)
-        
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)
         self.calc_spec_button.setEnabled(False)
-        
+        self.worker.start()
+    
+    def calculate_correlation_dim(self):
+        if not self._check_ready():
+            return
+        self.worker = ChaosWorker(self.current_data.data, self.tau, self.m, 'correlation_dim')
+        self.worker.finished.connect(self.on_correlation_complete)
+        self.worker.error.connect(self.on_error)
+        self.worker.progress.connect(self.on_progress)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.calc_corr_button.setEnabled(False)
         self.worker.start()
     
     def on_lyapunov_complete(self, results):
-        """Handle Lyapunov calculation completion"""
         self.progress.setVisible(False)
         self.calc_lyap_button.setEnabled(True)
         self.status_label.setText("")
@@ -282,39 +241,27 @@ class ChaosAnalysisPanel(QWidget):
         algo_name = results.get('algorithm', 'Unknown')
         self.lyap_result_label.setText(f"λ₁ = {lyap:.4f}")
         
-        # Interpretation
         info = f"Algorithm: {algo_name}\n"
         info += f"Largest Lyapunov Exponent: {lyap:.4f}\n\n"
-        
         if np.isnan(lyap):
-            info += "✗ Calculation failed or insufficient divergence.\n"
+            info += "Calculation failed or insufficient divergence.\n"
         elif lyap > 0.1:
-            info += "✓ Positive Lyapunov exponent - CHAOTIC behavior\n"
+            info += "Positive Lyapunov exponent - CHAOTIC behavior\n"
         elif lyap > 0:
-            info += "⚠ Small positive exponent - Weak chaos\n"
+            info += "Small positive exponent - Weak chaos\n"
         elif abs(lyap) < 0.01:
-            info += "≈ Near zero - Periodic or quasi-periodic\n"
+            info += "Near zero - Periodic or quasi-periodic\n"
         else:
-            info += "✗ Negative exponent - Stable/damped system\n"
-        
+            info += "Negative exponent - Stable/damped system\n"
         self.lyap_info.setText(info)
         
-        # Update plot if Rosenstein results are available
-        self.plot_widget.clear()
-        if 't_steps' in results and 'divergence' in results:
-            self.plot_widget.setLabel('left', 'ln(divergence)')
-            self.plot_widget.setLabel('bottom', 'Time')
-            
-            t = results['t_steps']
-            d = results['divergence']
-            valid = ~np.isnan(d)
-            self.plot_widget.plot(t[valid], d[valid], pen=pg.mkPen(color='#0e639c', width=2))
-        
+        self.plot_requested.emit({
+            'type': 'chaos_lyapunov',
+            'results': results
+        })
         self.analysis_complete.emit(results)
-
     
     def on_spectrum_complete(self, results):
-        """Handle Lyapunov spectrum calculation completion"""
         self.progress.setVisible(False)
         self.calc_spec_button.setEnabled(True)
         self.status_label.setText("")
@@ -329,52 +276,32 @@ class ChaosAnalysisPanel(QWidget):
             self.spec_result_label.setText("Spectrum calculation failed")
             return
         
-        # Ustel degerlerini goster
         exp_strs = [f"λ{i+1}={e:.4f}" for i, e in enumerate(exponents)]
         self.spec_result_label.setText("  ".join(exp_strs))
         
-        # Detay bilgisi
         info = f"Full Lyapunov Spectrum (Benettin/QR method)\n"
         info += f"Embedding dimension: m={self.m}, Steps used: {n_steps}\n"
         info += f"Kaplan-Yorke Dimension: D_KY = {ky_dim:.4f}\n"
         info += f"Kolmogorov-Sinai Entropy: h_KS = {ks_ent:.4f} nats/s\n\n"
-        
         n_pos = int(np.sum(exponents > 0))
         n_zero = int(np.sum(np.abs(exponents) < 0.01))
         n_neg = int(np.sum(exponents < -0.01))
         info += f"Positive: {n_pos}, Near-zero: {n_zero}, Negative: {n_neg}\n"
-        
         if n_pos > 0:
             info += "System exhibits CHAOTIC behavior"
         elif n_zero > 0:
             info += "System may be quasi-periodic"
         else:
             info += "System appears STABLE (all exponents negative)"
-        
         self.spec_info.setText(info)
         
-        # Bar chart
-        self.spec_plot.clear()
-        x = np.arange(len(exponents))
-        colors = []
-        for e in exponents:
-            if e > 0.01:
-                colors.append('#dc322f')   # kirmizi - kaotik
-            elif e > -0.01:
-                colors.append('#b58900')   # sari - yaklasik sifir
-            else:
-                colors.append('#268bd2')   # mavi - negatif
-        
-        bargraph = pg.BarGraphItem(x=x, height=exponents, width=0.6,
-                                   brushes=colors)
-        self.spec_plot.addItem(bargraph)
-        self.spec_plot.addLine(y=0, pen=pg.mkPen('#888888', width=1, style=Qt.DashLine))
-        
+        self.plot_requested.emit({
+            'type': 'chaos_spectrum',
+            'exponents': exponents
+        })
         self.analysis_complete.emit(results)
-
     
     def on_correlation_complete(self, results):
-        """Handle correlation dimension completion"""
         self.progress.setVisible(False)
         self.calc_corr_button.setEnabled(True)
         self.status_label.setText("")
@@ -382,30 +309,16 @@ class ChaosAnalysisPanel(QWidget):
         dim = results['dimension']
         self.corr_result_label.setText(f"D₂ = {dim:.4f}")
         
-        # Plot log-log correlation sum
-        self.plot_widget.clear()
-        self.plot_widget.setLabel('left', 'log(C(r))')
-        self.plot_widget.setLabel('bottom', 'log(r)')
-        
-        radii = results['radii']
-        c_r = results['c_r']
-        
-        valid = c_r > 0
-        if np.any(valid):
-            log_r = np.log(radii[valid])
-            log_c = np.log(c_r[valid])
-            self.plot_widget.plot(log_r, log_c,
-                                pen=pg.mkPen(color='#859900', width=2),
-                                symbol='o', symbolSize=5)
-        
+        self.plot_requested.emit({
+            'type': 'chaos_correlation',
+            'results': results
+        })
         self.analysis_complete.emit(results)
     
     def on_progress(self, message):
-        """Handle progress update"""
         self.status_label.setText(message)
     
     def on_error(self, error_msg):
-        """Handle error"""
         self.progress.setVisible(False)
         self.calc_lyap_button.setEnabled(True)
         self.calc_corr_button.setEnabled(True)
@@ -413,22 +326,10 @@ class ChaosAnalysisPanel(QWidget):
         self.status_label.setText(f"Error: {error_msg}")
     
     def _check_ready(self):
-        """Check if ready for analysis"""
-        return (self.current_data is not None and 
-                self.tau is not None and 
+        return (self.current_data is not None and
+                self.tau is not None and
                 self.m is not None)
     
-    def update_plot_theme(self):
-        """Update plot theme"""
-        theme = self.theme_manager.get_theme()
-        for pw in [self.plot_widget, self.spec_plot]:
-            pw.setBackground(theme.colors['plot_bg'])
-            for axis in ['left', 'bottom', 'right', 'top']:
-                ax = pw.getAxis(axis)
-                ax.setPen(pg.mkPen(color=theme.colors['plot_text'], width=1))
-                ax.setTextPen(pg.mkPen(color=theme.colors['plot_text']))
-    
     def refresh_ui(self):
-        """Refresh UI with current language"""
         self.calc_lyap_button.setText(self.tm('btn_calculate') + ' Lyapunov')
         self.calc_corr_button.setText(self.tm('btn_calculate') + ' Correlation Dim')

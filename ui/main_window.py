@@ -12,6 +12,7 @@ from .themes import ThemeManager
 from .translations import TranslationManager
 from .panels.steps_panel import StepsPanel
 from .panels.content_panel import ContentPanel
+from .panels.plot_panel import PlotPanel
 from .dialogs.preferences_dialog import PreferencesDialog
 
 
@@ -51,19 +52,26 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create splitter for resizable panels
+        # Create splitter for resizable panels (3 dikey bolme)
         splitter = QSplitter(Qt.Horizontal)
         
-        # Left panel - Steps
+        # Sol panel — Analiz Adimlari
         self.steps_panel = StepsPanel(self.translation_manager)
         splitter.addWidget(self.steps_panel)
         
-        # Right panel - Content (data view + plots)
+        # Orta panel — Kontroller / Veri
         self.content_panel = ContentPanel(self.translation_manager, self.theme_manager)
         splitter.addWidget(self.content_panel)
         
-        # Set splitter proportions (30% left, 70% right)
-        splitter.setSizes([420, 980])
+        # Sag panel — Grafik
+        self.plot_panel = PlotPanel(self.theme_manager)
+        splitter.addWidget(self.plot_panel)
+        
+        # ContentPanel'den gelen grafik isteklerini PlotPanel'e bagla
+        self.content_panel.plot_requested.connect(self.plot_panel.handle_plot)
+        
+        # Splitter oranlari (%20 sol, %30 orta, %50 sag)
+        splitter.setSizes([280, 420, 700])
         
         main_layout.addWidget(splitter)
         
@@ -184,9 +192,11 @@ class MainWindow(QMainWindow):
         self.theme_manager.set_theme(theme_name)
         self.theme_changed.emit(theme_name)
         
-        # Update content panel with new theme
+        # Update panels with new theme
         if hasattr(self, 'content_panel'):
             self.content_panel.update_plot_theme()
+        if hasattr(self, 'plot_panel'):
+            self.plot_panel.update_plot_theme()
     
     def set_language(self, language: str):
         """Set application language"""
