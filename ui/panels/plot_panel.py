@@ -480,7 +480,10 @@ class PlotPanel(QWidget):
     def _plot_embedding_3d(self, d, widget, title_label):
         """3D Faz Uzayı: x(t), x(t+τ), x(t+2τ) - Gerçek 3D görselleştirme"""
         tau = d.get('tau', '?')
-        title_label.setText(f"3D Faz Uzayı (τ={tau}) - Fare ile döndür/zoom yap")
+        title_label.setText(
+            f"3D Faz Uzayı (τ={tau}) | "
+            f"Renk: Mavi (başlangıç) → Kırmızı (bitiş) = Zaman akışı"
+        )
         
         x = d['x']
         y = d['y']
@@ -539,6 +542,39 @@ class PlotPanel(QWidget):
             pxMode=True
         )
         widget.addItem(end_scatter)
+        
+        # Color bar legend (sağ üst köşede, 3D sahne içinde)
+        # Dikey gradient çizgisi
+        x_max, y_max, z_max = pos.max(axis=0)
+        x_min, y_min, z_min = pos.min(axis=0)
+        
+        # Colorbar konumu (sağ üst köşe)
+        cb_x = x_max + (x_max - x_min) * 0.15
+        cb_y = y_max - (y_max - y_min) * 0.15
+        cb_z_start = z_min + (z_max - z_min) * 0.2
+        cb_z_end = z_min + (z_max - z_min) * 0.8
+        
+        # Colorbar gradient (10 segment)
+        n_segments = 20
+        cb_pos = []
+        cb_colors = []
+        for i in range(n_segments):
+            t = i / (n_segments - 1)
+            cb_pos.append([cb_x, cb_y, cb_z_start + t * (cb_z_end - cb_z_start)])
+            # Mavi -> kırmızı
+            cb_colors.append([t, 0, 1-t, 1])
+        
+        cb_pos = np.array(cb_pos)
+        cb_colors = np.array(cb_colors)
+        
+        colorbar = gl.GLLinePlotItem(
+            pos=cb_pos,
+            color=cb_colors,
+            width=8,
+            antialias=True,
+            mode='line_strip'
+        )
+        widget.addItem(colorbar)
         
         # Grid (referans için)
         grid = gl.GLGridItem()
