@@ -84,6 +84,18 @@ class ContentPanel(QWidget):
         self.data_table = DataTablePanel(self.tm)
         self.data_load_panel.set_table_widget(self.data_table)
 
+        # Splitter handle stilini ayarla (gorunur yap)
+        self.vsplitter.setHandleWidth(6)
+        self.vsplitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #555555;
+                border: 1px solid #333333;
+            }
+            QSplitter::handle:hover {
+                background-color: #777777;
+            }
+        """)
+
         layout.addWidget(self.vsplitter)
 
     def _forward_plot(self, plot_data: dict):

@@ -80,6 +80,18 @@ class MainWindow(QMainWindow):
         # Splitter oranlari (%20 sol, %30 orta, %50 sag)
         splitter.setSizes([280, 420, 700])
         
+        # Splitter handle stilini ayarla (gorunur yap)
+        splitter.setHandleWidth(6)
+        splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #555555;
+                border: 1px solid #333333;
+            }
+            QSplitter::handle:hover {
+                background-color: #777777;
+            }
+        """)
+        
         main_layout.addWidget(splitter)
         
         # Status bar
