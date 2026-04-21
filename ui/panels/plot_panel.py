@@ -8,10 +8,88 @@ from PySide6.QtWidgets import (
     QPushButton, QSplitter, QGroupBox, QStackedWidget
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QMouseEvent
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 import numpy as np
 from typing import Dict, List, Optional
+
+
+class CustomGLViewWidget(gl.GLViewWidget):
+    """
+    Custom GLViewWidget with swapped mouse controls:
+    - Right click + drag = Rotate (default: left click)
+    - Left click + drag = Pan (default: middle click)
+    """
+    
+    def mousePressEvent(self, ev: QMouseEvent):
+        """Override mouse press to swap left/right button behavior"""
+        # Swap left <-> right button
+        if ev.button() == Qt.LeftButton:
+            # Pretend it's middle button (pan)
+            ev = QMouseEvent(
+                ev.type(),
+                ev.pos(),
+                Qt.MiddleButton,  # Change to middle button
+                Qt.MiddleButton,
+                ev.modifiers()
+            )
+        elif ev.button() == Qt.RightButton:
+            # Pretend it's left button (rotate)
+            ev = QMouseEvent(
+                ev.type(),
+                ev.pos(),
+                Qt.LeftButton,  # Change to left button
+                Qt.LeftButton,
+                ev.modifiers()
+            )
+        
+        super().mousePressEvent(ev)
+    
+    def mouseMoveEvent(self, ev: QMouseEvent):
+        """Override mouse move to swap left/right button behavior"""
+        buttons = ev.buttons()
+        
+        # Swap left <-> right button states
+        new_buttons = Qt.NoButton
+        if buttons & Qt.LeftButton:
+            new_buttons |= Qt.MiddleButton  # Pan
+        if buttons & Qt.RightButton:
+            new_buttons |= Qt.LeftButton  # Rotate
+        if buttons & Qt.MiddleButton:
+            new_buttons |= Qt.RightButton  # (original middle -> right)
+        
+        ev = QMouseEvent(
+            ev.type(),
+            ev.pos(),
+            new_buttons,
+            new_buttons,
+            ev.modifiers()
+        )
+        
+        super().mouseMoveEvent(ev)
+    
+    def mouseReleaseEvent(self, ev: QMouseEvent):
+        """Override mouse release to swap left/right button behavior"""
+        # Swap left <-> right button
+        if ev.button() == Qt.LeftButton:
+            ev = QMouseEvent(
+                ev.type(),
+                ev.pos(),
+                Qt.MiddleButton,
+                Qt.NoButton,
+                ev.modifiers()
+            )
+        elif ev.button() == Qt.RightButton:
+            ev = QMouseEvent(
+                ev.type(),
+                ev.pos(),
+                Qt.LeftButton,
+                Qt.NoButton,
+                ev.modifiers()
+            )
+        
+        super().mouseReleaseEvent(ev)
 
 
 class PlotPanel(QWidget):
@@ -57,7 +135,7 @@ class PlotPanel(QWidget):
         top_3d_container.setLayout(QVBoxLayout())
         top_3d_container.layout().setContentsMargins(0, 0, 0, 0)
         
-        self.top_3d_widget = gl.GLViewWidget()
+        self.top_3d_widget = CustomGLViewWidget()
         self._apply_theme_3d(self.top_3d_widget)
         top_3d_container.layout().addWidget(self.top_3d_widget)
         
@@ -110,7 +188,7 @@ class PlotPanel(QWidget):
         bottom_3d_container.setLayout(QVBoxLayout())
         bottom_3d_container.layout().setContentsMargins(0, 0, 0, 0)
         
-        self.bottom_3d_widget = gl.GLViewWidget()
+        self.bottom_3d_widget = CustomGLViewWidget()
         self._apply_theme_3d(self.bottom_3d_widget)
         bottom_3d_container.layout().addWidget(self.bottom_3d_widget)
         
