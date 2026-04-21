@@ -7,6 +7,7 @@ Kaotik zaman serilerinin doğrusal olmayan analizi icin gelistirilmis masaustu u
 - **10 Kaotik Sistem Ureteci**: Lorenz, Rossler, Chua, Chen, Duffing, Logistic, Henon, Tent, Sine, Ikeda
 - **12 Preprocessing Fonksiyonu**: Normalize, detrend, outlier removal, smooth, difference, resample, filter, log/boxcox transform, windowing, denoise
 - **Otomatik Parametre Tahmini**: AMI (gecikme suresi tau) ve FNN (gomme boyutu m) ile veri tabanli parametre secimi
+- **Faz Uzayi Gorsellestirme**: 2D/3D phase space, return map, atraktör yapısı
 - **Wolf Lyapunov Algoritmasi**: Orijinal MATLAB koduna sadik implementasyon (KD-Tree tabanli komsu arama)
 - **Rosenstein Lyapunov Algoritmasi**: Otomatik egri uydurmali (auto-fit) en buyuk Lyapunov usteli hesaplama
 - **Korelasyon Boyutu**: Grassberger-Procaccia algoritmasi
@@ -135,6 +136,26 @@ Sağ taraftaki grafik paneli artık iki bölümlü:
 
 ### Auto-Range
 Tüm grafikler otomatik olarak viewport'a sığar (PyQtGraph autoRange). Manuel zoom/pan yine kullanılabilir.
+
+### Faz Uzayı Görselleştirme (Step 5)
+Zaman gecikmeli gömme ile oluşturulan faz uzayını görselleştirir:
+
+**2D Faz Uzayı:**
+- x(t) vs x(t+τ) trajectory plot
+- Başlangıç (kırmızı) ve bitiş (yeşil) noktaları
+- Atraktör yapısını 2D'de göster
+
+**3D Faz Uzayı:**
+- x(t), x(t+τ), x(t+2τ) 
+- XY izdüşümü, Z renk kodlamalı (mavi→kırmızı)
+- Lorenz butterfly, Rössler spiral görselleştirmesi
+
+**Geri Dönüş Haritası:**
+- x(t) vs x(t+1) scatter plot
+- y=x diagonal referans çizgisi
+- Kaotik/periyodik yapı analizi
+
+τ ve m parametreleri Step 4'ten otomatik gelir, manuel override yapılabilir.
 
 ## Export ve Session Yönetimi
 
