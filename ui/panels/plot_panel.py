@@ -43,7 +43,7 @@ class PlotPanel(QWidget):
         self.top_title_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
         top_layout.addWidget(self.top_title_label)
 
-        # Stack: 2D (PlotWidget) + 3D (GLViewWidget)
+        # Stack: 2D (PlotWidget) + 3D (GLViewWidget with overlay)
         self.top_stack = QStackedWidget()
         
         self.top_plot_widget = pg.PlotWidget()
@@ -52,9 +52,21 @@ class PlotPanel(QWidget):
         self._apply_theme(self.top_plot_widget)
         self.top_stack.addWidget(self.top_plot_widget)  # index 0
         
+        # 3D container (GLViewWidget + color bar overlay)
+        top_3d_container = QWidget()
+        top_3d_container.setLayout(QVBoxLayout())
+        top_3d_container.layout().setContentsMargins(0, 0, 0, 0)
+        
         self.top_3d_widget = gl.GLViewWidget()
         self._apply_theme_3d(self.top_3d_widget)
-        self.top_stack.addWidget(self.top_3d_widget)  # index 1
+        top_3d_container.layout().addWidget(self.top_3d_widget)
+        
+        # Color bar overlay (sag alt kose)
+        self.top_colorbar_label = self._create_colorbar_label()
+        self.top_colorbar_label.setParent(top_3d_container)
+        self.top_colorbar_label.hide()  # Baslangicta gizli
+        
+        self.top_stack.addWidget(top_3d_container)  # index 1
         
         top_layout.addWidget(self.top_stack)
         self.vsplitter.addWidget(top_widget)
@@ -84,7 +96,7 @@ class PlotPanel(QWidget):
         self.bottom_title_label.setStyleSheet("font-size: 10pt; font-style: italic;")
         bottom_layout.addWidget(self.bottom_title_label)
 
-        # Stack: 2D (PlotWidget) + 3D (GLViewWidget)
+        # Stack: 2D (PlotWidget) + 3D (GLViewWidget with overlay)
         self.bottom_stack = QStackedWidget()
         
         self.bottom_plot_widget = pg.PlotWidget()
@@ -93,9 +105,21 @@ class PlotPanel(QWidget):
         self._apply_theme(self.bottom_plot_widget)
         self.bottom_stack.addWidget(self.bottom_plot_widget)  # index 0
         
+        # 3D container (GLViewWidget + color bar overlay)
+        bottom_3d_container = QWidget()
+        bottom_3d_container.setLayout(QVBoxLayout())
+        bottom_3d_container.layout().setContentsMargins(0, 0, 0, 0)
+        
         self.bottom_3d_widget = gl.GLViewWidget()
         self._apply_theme_3d(self.bottom_3d_widget)
-        self.bottom_stack.addWidget(self.bottom_3d_widget)  # index 1
+        bottom_3d_container.layout().addWidget(self.bottom_3d_widget)
+        
+        # Color bar overlay (sag alt kose)
+        self.bottom_colorbar_label = self._create_colorbar_label()
+        self.bottom_colorbar_label.setParent(bottom_3d_container)
+        self.bottom_colorbar_label.hide()  # Baslangicta gizli
+        
+        self.bottom_stack.addWidget(bottom_3d_container)  # index 1
         
         bottom_layout.addWidget(self.bottom_stack)
         self.vsplitter.addWidget(bottom_widget)
@@ -110,6 +134,10 @@ class PlotPanel(QWidget):
         # 2D widget'lara gec ve temizle
         self.top_stack.setCurrentIndex(0)
         self.bottom_stack.setCurrentIndex(0)
+        
+        # Color bar'ları gizle
+        self.top_colorbar_label.hide()
+        self.bottom_colorbar_label.hide()
         
         self.top_plot_widget.clear()
         self.top_title_label.setText("Grafik")
@@ -132,6 +160,8 @@ class PlotPanel(QWidget):
         else:
             # 2D widget'a gec
             self.top_stack.setCurrentIndex(0)
+            # Color bar'ı gizle (2D grafiklerde görünmemeli)
+            self.top_colorbar_label.hide()
             
             # Grafigi ciz (ust panel)
             if ptype == 'timeseries':
@@ -256,6 +286,8 @@ class PlotPanel(QWidget):
             else:
                 # 2D widget'a gec
                 self.bottom_stack.setCurrentIndex(0)
+                # Color bar'ı gizle
+                self.bottom_colorbar_label.hide()
                 self._render_plot_to_widget(
                     entry['data'], 
                     self.bottom_plot_widget, 
@@ -268,6 +300,8 @@ class PlotPanel(QWidget):
         """Alt paneli temizle"""
         # 2D widget'a gec ve temizle
         self.bottom_stack.setCurrentIndex(0)
+        # Color bar'ı gizle
+        self.bottom_colorbar_label.hide()
         self.bottom_plot_widget.clear()
         self.bottom_title_label.setText("(Bos)")
         self.bottom_combo.blockSignals(True)
@@ -495,6 +529,25 @@ class PlotPanel(QWidget):
         # Widget'ı temizle (tüm item'ları kaldır)
         widget.clear()
         
+        # Color bar'ı göster (hangi panel olduğunu kontrol et)
+        if widget == self.top_3d_widget:
+            self.top_colorbar_label.show()
+            self.top_colorbar_label.raise_()
+            # Pozisyonu ayarla (sağ alt köşe)
+            parent = self.top_colorbar_label.parent()
+            self.top_colorbar_label.move(
+                parent.width() - self.top_colorbar_label.width() - 10,
+                parent.height() - self.top_colorbar_label.height() - 10
+            )
+        elif widget == self.bottom_3d_widget:
+            self.bottom_colorbar_label.show()
+            self.bottom_colorbar_label.raise_()
+            parent = self.bottom_colorbar_label.parent()
+            self.bottom_colorbar_label.move(
+                parent.width() - self.bottom_colorbar_label.width() - 10,
+                parent.height() - self.bottom_colorbar_label.height() - 10
+            )
+        
         # 3D koordinatlar (numpy array olarak)
         pos = np.column_stack([x, y, z])
         
@@ -542,39 +595,6 @@ class PlotPanel(QWidget):
             pxMode=True
         )
         widget.addItem(end_scatter)
-        
-        # Color bar legend (sağ üst köşede, 3D sahne içinde)
-        # Dikey gradient çizgisi
-        x_max, y_max, z_max = pos.max(axis=0)
-        x_min, y_min, z_min = pos.min(axis=0)
-        
-        # Colorbar konumu (sağ üst köşe)
-        cb_x = x_max + (x_max - x_min) * 0.15
-        cb_y = y_max - (y_max - y_min) * 0.15
-        cb_z_start = z_min + (z_max - z_min) * 0.2
-        cb_z_end = z_min + (z_max - z_min) * 0.8
-        
-        # Colorbar gradient (10 segment)
-        n_segments = 20
-        cb_pos = []
-        cb_colors = []
-        for i in range(n_segments):
-            t = i / (n_segments - 1)
-            cb_pos.append([cb_x, cb_y, cb_z_start + t * (cb_z_end - cb_z_start)])
-            # Mavi -> kırmızı
-            cb_colors.append([t, 0, 1-t, 1])
-        
-        cb_pos = np.array(cb_pos)
-        cb_colors = np.array(cb_colors)
-        
-        colorbar = gl.GLLinePlotItem(
-            pos=cb_pos,
-            color=cb_colors,
-            width=8,
-            antialias=True,
-            mode='line_strip'
-        )
-        widget.addItem(colorbar)
         
         # Grid (referans için)
         grid = gl.GLGridItem()
@@ -643,3 +663,42 @@ class PlotPanel(QWidget):
             g = int(bg_hex[3:5], 16) / 255.0
             b = int(bg_hex[5:7], 16) / 255.0
             glview.setBackgroundColor((r, g, b, 1.0))
+    
+    def _create_colorbar_label(self):
+        """Sabit 2D color bar overlay (sag alt kose, yatay gradient)"""
+        from PySide6.QtGui import QLinearGradient, QPainter, QPixmap
+        from PySide6.QtCore import QRect, QPoint
+        
+        label = QLabel()
+        label.setFixedSize(200, 40)  # Genislik x Yukseklik
+        
+        # Gradient pixmap olustur (mavi -> kirmizi, soldan saga)
+        pixmap = QPixmap(200, 40)
+        pixmap.fill(Qt.transparent)
+        
+        painter = QPainter(pixmap)
+        
+        # Gradient bar (ust 20 piksel)
+        gradient = QLinearGradient(0, 0, 200, 0)  # Yatay (soldan saga)
+        gradient.setColorAt(0.0, Qt.blue)
+        gradient.setColorAt(1.0, Qt.red)
+        
+        painter.setBrush(gradient)
+        painter.setPen(Qt.white)
+        painter.drawRect(0, 0, 199, 15)
+        
+        # Metin etiketleri
+        painter.setPen(Qt.white)
+        painter.drawText(5, 32, "t=0 (başlangıç)")
+        painter.drawText(120, 32, "t=son (bitiş)")
+        
+        painter.end()
+        
+        label.setPixmap(pixmap)
+        label.setStyleSheet("""
+            background-color: rgba(0, 0, 0, 150);
+            border-radius: 5px;
+            padding: 5px;
+        """)
+        
+        return label
