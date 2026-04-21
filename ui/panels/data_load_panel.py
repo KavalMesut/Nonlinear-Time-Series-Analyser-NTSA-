@@ -31,10 +31,38 @@ class DataLoadPanel(QWidget):
         source_group = QGroupBox(self.tm('data_source'))
         source_layout = QVBoxLayout()
         
-        # Radio buttons for source type
+        # Radio buttons for source type (styled as toggle buttons)
         self.source_group = QButtonGroup()
         self.file_radio = QRadioButton(self.tm('data_load_file'))
         self.generate_radio = QRadioButton(self.tm('data_generate'))
+        
+        # Style radio buttons as toggle buttons
+        radio_style = """
+            QRadioButton {
+                background-color: #404040;
+                border: 1px solid #555555;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-size: 10pt;
+                color: #cccccc;
+            }
+            QRadioButton:hover {
+                background-color: #4a4a4a;
+                border-color: #666666;
+            }
+            QRadioButton:checked {
+                background-color: #90ee90;
+                color: #000000;
+                border-color: #70ce70;
+                font-weight: bold;
+            }
+            QRadioButton::indicator {
+                width: 0px;
+                height: 0px;
+            }
+        """
+        self.file_radio.setStyleSheet(radio_style)
+        self.generate_radio.setStyleSheet(radio_style)
         
         self.source_group.addButton(self.file_radio, 0)
         self.source_group.addButton(self.generate_radio, 1)
