@@ -5,10 +5,11 @@ Split layout: ust panel (aktif), alt panel (karsilastirma icin secilmis grafik).
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
-    QPushButton, QSplitter, QGroupBox
+    QPushButton, QSplitter, QGroupBox, QStackedWidget
 )
 from PySide6.QtCore import Qt
 import pyqtgraph as pg
+import pyqtgraph.opengl as gl
 import numpy as np
 from typing import Dict, List, Optional
 
@@ -42,12 +43,20 @@ class PlotPanel(QWidget):
         self.top_title_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
         top_layout.addWidget(self.top_title_label)
 
+        # Stack: 2D (PlotWidget) + 3D (GLViewWidget)
+        self.top_stack = QStackedWidget()
+        
         self.top_plot_widget = pg.PlotWidget()
         self.top_plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self.top_plot_widget.addLegend()
         self._apply_theme(self.top_plot_widget)
-        top_layout.addWidget(self.top_plot_widget)
-
+        self.top_stack.addWidget(self.top_plot_widget)  # index 0
+        
+        self.top_3d_widget = gl.GLViewWidget()
+        self._apply_theme_3d(self.top_3d_widget)
+        self.top_stack.addWidget(self.top_3d_widget)  # index 1
+        
+        top_layout.addWidget(self.top_stack)
         self.vsplitter.addWidget(top_widget)
 
         # --- ALT GRAFIK (karsilastirma icin) ---
@@ -75,12 +84,20 @@ class PlotPanel(QWidget):
         self.bottom_title_label.setStyleSheet("font-size: 10pt; font-style: italic;")
         bottom_layout.addWidget(self.bottom_title_label)
 
+        # Stack: 2D (PlotWidget) + 3D (GLViewWidget)
+        self.bottom_stack = QStackedWidget()
+        
         self.bottom_plot_widget = pg.PlotWidget()
         self.bottom_plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self.bottom_plot_widget.addLegend()
         self._apply_theme(self.bottom_plot_widget)
-        bottom_layout.addWidget(self.bottom_plot_widget)
-
+        self.bottom_stack.addWidget(self.bottom_plot_widget)  # index 0
+        
+        self.bottom_3d_widget = gl.GLViewWidget()
+        self._apply_theme_3d(self.bottom_3d_widget)
+        self.bottom_stack.addWidget(self.bottom_3d_widget)  # index 1
+        
+        bottom_layout.addWidget(self.bottom_stack)
         self.vsplitter.addWidget(bottom_widget)
 
         # Split oranlari: %50 ust, %50 alt
@@ -90,6 +107,10 @@ class PlotPanel(QWidget):
 
     def clear_plot(self):
         """Tüm grafikleri temizle"""
+        # 2D widget'lara gec ve temizle
+        self.top_stack.setCurrentIndex(0)
+        self.bottom_stack.setCurrentIndex(0)
+        
         self.top_plot_widget.clear()
         self.top_title_label.setText("Grafik")
         self.bottom_plot_widget.clear()
@@ -103,32 +124,39 @@ class PlotPanel(QWidget):
         """
         ptype = plot_data.get('type', '')
 
-        # Grafigi ciz (ust panel)
-        if ptype == 'timeseries':
-            self._plot_timeseries(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'linear':
-            self._plot_linear(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'param_tau':
-            self._plot_param_tau(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'param_m':
-            self._plot_param_m(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'chaos_lyapunov':
-            self._plot_chaos_lyapunov(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'chaos_spectrum':
-            self._plot_chaos_spectrum(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'chaos_correlation':
-            self._plot_chaos_correlation(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'preprocessing':
-            self._plot_preprocessing(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'embedding_2d':
-            self._plot_embedding_2d(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'embedding_3d':
-            self._plot_embedding_3d(plot_data, self.top_plot_widget, self.top_title_label)
-        elif ptype == 'return_map':
-            self._plot_return_map(plot_data, self.top_plot_widget, self.top_title_label)
+        # 3D grafik mi kontrol et
+        if ptype == 'embedding_3d':
+            # 3D widget'a gec
+            self.top_stack.setCurrentIndex(1)
+            self._plot_embedding_3d(plot_data, self.top_3d_widget, self.top_title_label)
+        else:
+            # 2D widget'a gec
+            self.top_stack.setCurrentIndex(0)
+            
+            # Grafigi ciz (ust panel)
+            if ptype == 'timeseries':
+                self._plot_timeseries(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'linear':
+                self._plot_linear(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'param_tau':
+                self._plot_param_tau(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'param_m':
+                self._plot_param_m(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'chaos_lyapunov':
+                self._plot_chaos_lyapunov(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'chaos_spectrum':
+                self._plot_chaos_spectrum(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'chaos_correlation':
+                self._plot_chaos_correlation(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'preprocessing':
+                self._plot_preprocessing(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'embedding_2d':
+                self._plot_embedding_2d(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'return_map':
+                self._plot_return_map(plot_data, self.top_plot_widget, self.top_title_label)
 
-        # Auto-range (grafigi tam ekrana sigdir)
-        self.top_plot_widget.autoRange()
+            # Auto-range (grafigi tam ekrana sigdir)
+            self.top_plot_widget.autoRange()
 
         # History'e ekle
         self._add_to_history(plot_data)
@@ -219,16 +247,27 @@ class PlotPanel(QWidget):
         history_idx = len(self.plot_history) - index  # Ters sirada
         if 0 <= history_idx < len(self.plot_history):
             entry = self.plot_history[history_idx]
-            self._render_plot_to_widget(
-                entry['data'], 
-                self.bottom_plot_widget, 
-                self.bottom_title_label
-            )
-            # Auto-range
-            self.bottom_plot_widget.autoRange()
+            ptype = entry['data'].get('type', '')
+            
+            if ptype == 'embedding_3d':
+                # 3D widget'a gec
+                self.bottom_stack.setCurrentIndex(1)
+                self._plot_embedding_3d(entry['data'], self.bottom_3d_widget, self.bottom_title_label)
+            else:
+                # 2D widget'a gec
+                self.bottom_stack.setCurrentIndex(0)
+                self._render_plot_to_widget(
+                    entry['data'], 
+                    self.bottom_plot_widget, 
+                    self.bottom_title_label
+                )
+                # Auto-range
+                self.bottom_plot_widget.autoRange()
 
     def _clear_bottom_plot(self):
         """Alt paneli temizle"""
+        # 2D widget'a gec ve temizle
+        self.bottom_stack.setCurrentIndex(0)
         self.bottom_plot_widget.clear()
         self.bottom_title_label.setText("(Bos)")
         self.bottom_combo.blockSignals(True)
@@ -236,7 +275,7 @@ class PlotPanel(QWidget):
         self.bottom_combo.blockSignals(False)
 
     def _render_plot_to_widget(self, plot_data: dict, widget: pg.PlotWidget, title_label: QLabel):
-        """Belirli bir plot_data'yi widget'a ciz"""
+        """Belirli bir plot_data'yi 2D widget'a ciz (3D haric)"""
         ptype = plot_data.get('type', '')
 
         if ptype == 'timeseries':
@@ -257,8 +296,6 @@ class PlotPanel(QWidget):
             self._plot_preprocessing(plot_data, widget, title_label)
         elif ptype == 'embedding_2d':
             self._plot_embedding_2d(plot_data, widget, title_label)
-        elif ptype == 'embedding_3d':
-            self._plot_embedding_3d(plot_data, widget, title_label)
         elif ptype == 'return_map':
             self._plot_return_map(plot_data, widget, title_label)
 
@@ -441,51 +478,85 @@ class PlotPanel(QWidget):
                     symbolBrush='#859900', name='End')
 
     def _plot_embedding_3d(self, d, widget, title_label):
-        """3D Faz Uzayı: x(t), x(t+τ), x(t+2τ)"""
-        # PyQtGraph 2D plot widget'ında 3D gösteremeyiz
-        # Bunun yerine XY projection göster, Z'yi renk olarak kodla
-        widget.clear()
-        widget.setLogMode(y=False)
+        """3D Faz Uzayı: x(t), x(t+τ), x(t+2τ) - Gerçek 3D görselleştirme"""
         tau = d.get('tau', '?')
-        title_label.setText(f"3D Faz Uzayı (τ={tau}) - 2D İzdüşüm")
+        title_label.setText(f"3D Faz Uzayı (τ={tau}) - Fare ile döndür/zoom yap")
         
         x = d['x']
         y = d['y']
         z = d.get('z')
         
-        if z is not None:
-            # XY projection göster
-            widget.setLabel('left', f'x(t+{tau})')
-            widget.setLabel('bottom', 'x(t)')
-            
-            # Z değerini renge kodla (color-coded)
-            z_norm = (z - z.min()) / (z.max() - z.min() + 1e-10)
-            
-            # Gradient: mavi -> kırmızı (RGB kullan)
-            # Mavi (0, 0, 255) -> Kırmızı (255, 0, 0)
-            colors = []
-            for zn in z_norm:
-                r = int(255 * zn)
-                b = int(255 * (1 - zn))
-                # QColor veya (R, G, B, A) tuple
-                colors.append((r, 0, b, 150))  # Alpha=150 (yarı saydam)
-            
-            # Scatter plot with color coding
-            scatter = pg.ScatterPlotItem(
-                x=x, y=y, 
-                size=3, 
-                brush=colors,  # Liste olarak renk ver
-                pen=None
-            )
-            widget.addItem(scatter)
-            
-            # Başlangıç/bitiş noktaları
-            widget.plot([x[0]], [y[0]], 
-                        pen=None, symbol='o', symbolSize=10, 
-                        symbolBrush='#dc322f', name='Start')
-            widget.plot([x[-1]], [y[-1]], 
-                        pen=None, symbol='s', symbolSize=10, 
-                        symbolBrush='#859900', name='End')
+        if z is None:
+            return
+        
+        # Widget'ı temizle (tüm item'ları kaldır)
+        widget.clear()
+        
+        # 3D koordinatlar (numpy array olarak)
+        pos = np.column_stack([x, y, z])
+        
+        # Renk gradient: zaman ilerledikçe mavi -> kırmızı
+        n = len(x)
+        colors = np.zeros((n, 4))
+        colors[:, 0] = np.linspace(0, 1, n)  # Kırmızı artıyor
+        colors[:, 2] = np.linspace(1, 0, n)  # Mavi azalıyor
+        colors[:, 3] = 0.6  # Alpha (yarı saydam)
+        
+        # Scatter plot (3D noktalar)
+        scatter = gl.GLScatterPlotItem(
+            pos=pos,
+            color=colors,
+            size=3,
+            pxMode=True  # Piksel cinsinden boyut
+        )
+        widget.addItem(scatter)
+        
+        # Trajectory line (çizgi)
+        line = gl.GLLinePlotItem(
+            pos=pos,
+            color=(0.5, 0.5, 0.5, 0.3),  # Gri, çok saydam
+            width=1,
+            antialias=True
+        )
+        widget.addItem(line)
+        
+        # Başlangıç noktası (büyük kırmızı nokta)
+        start_pos = np.array([pos[0]])
+        start_scatter = gl.GLScatterPlotItem(
+            pos=start_pos,
+            color=(1, 0, 0, 1),  # Kırmızı
+            size=10,
+            pxMode=True
+        )
+        widget.addItem(start_scatter)
+        
+        # Bitiş noktası (büyük yeşil nokta)
+        end_pos = np.array([pos[-1]])
+        end_scatter = gl.GLScatterPlotItem(
+            pos=end_pos,
+            color=(0, 1, 0, 1),  # Yeşil
+            size=10,
+            pxMode=True
+        )
+        widget.addItem(end_scatter)
+        
+        # Grid (referans için)
+        grid = gl.GLGridItem()
+        grid.scale(
+            (x.max() - x.min()) / 10,
+            (y.max() - y.min()) / 10,
+            (z.max() - z.min()) / 10
+        )
+        # Grid'i ortala
+        grid.translate(
+            (x.max() + x.min()) / 2,
+            (y.max() + y.min()) / 2,
+            z.min()
+        )
+        widget.addItem(grid)
+        
+        # Kamera ayarları (iyi bir başlangıç açısı)
+        widget.setCameraPosition(distance=np.ptp(pos) * 2.5)
 
     def _plot_return_map(self, d, widget, title_label):
         """Geri Dönüş Haritası: x(t) vs x(t+1)"""
@@ -525,3 +596,14 @@ class PlotPanel(QWidget):
             ax = pw.getAxis(axis)
             ax.setPen(pg.mkPen(color=theme.colors['plot_text'], width=1))
             ax.setTextPen(pg.mkPen(color=theme.colors['plot_text']))
+    
+    def _apply_theme_3d(self, glview: gl.GLViewWidget):
+        """3D widget icin tema uygula"""
+        theme = self.theme_manager.get_theme()
+        # Arka plan rengi (RGB tuple olarak)
+        bg_hex = theme.colors['plot_bg']
+        if bg_hex.startswith('#'):
+            r = int(bg_hex[1:3], 16) / 255.0
+            g = int(bg_hex[3:5], 16) / 255.0
+            b = int(bg_hex[5:7], 16) / 255.0
+            glview.setBackgroundColor((r, g, b, 1.0))
