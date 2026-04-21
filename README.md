@@ -12,6 +12,7 @@ Kaotik zaman serilerinin doğrusal olmayan analizi icin gelistirilmis masaustu u
 - **Korelasyon Boyutu**: Grassberger-Procaccia algoritmasi
 - **Dogrusal Analizler**: ACF, PACF, FFT (Hann/Hamming/Blackman pencerele)
 - **Export/Session Yönetimi**: CSV/PNG/JSON export, analiz durumunu kaydet/yükle (.tsa/.json)
+- **Split Plot Panel**: Üst/alt grafik karşılaştırma, 20 grafik geçmişi, auto-range
 - **Pipeline Motoru**: Bagimlilik cozumlemeli, onbellekli analiz zinciri
 - **PySide6 Arayuz**: PyQtGraph tabanli gorselleestirme
 - **Performans**: scipy KD-Tree, vektorize islemler (~43 saniye / 10 sistem validasyonu)
@@ -111,6 +112,29 @@ tseriesanalyser/
 ├── ROADMAP.md              # Proje spesifikasyonu
 └── requirements.txt        # Bagimliliklar
 ```
+
+## UI Özellikleri
+
+### Split Plot Panel (Yeni!)
+Sağ taraftaki grafik paneli artık iki bölümlü:
+
+**Üst Panel (Aktif Grafik)**
+- Mevcut analiz sonucu otomatik olarak gösterilir
+- Auto-range: Grafik tam ekrana otomatik sığar
+
+**Alt Panel (Karşılaştırma)**
+- Dropdown menüden geçmiş grafiklerden birini seç
+- Farklı analizleri yan yana karşılaştır
+- 20 grafik geçmişi saklanır
+
+**Kullanım Senaryoları:**
+- AMI sonucu ile Lyapunov eğrisini karşılaştır
+- Preprocessing öncesi/sonrası veriyi yan yana gör
+- Wolf vs Rosenstein algoritma sonuçlarını karşılaştır
+- ACF ile PACF'yi aynı anda incele
+
+### Auto-Range
+Tüm grafikler otomatik olarak viewport'a sığar (PyQtGraph autoRange). Manuel zoom/pan yine kullanılabilir.
 
 ## Export ve Session Yönetimi
 
