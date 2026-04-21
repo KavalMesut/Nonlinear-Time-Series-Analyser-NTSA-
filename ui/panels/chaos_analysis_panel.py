@@ -97,10 +97,32 @@ class ChaosAnalysisPanel(QWidget):
         # Parameters
         params_group = QGroupBox("Parameters")
         params_layout = QFormLayout()
+        
         self.tau_label = QLabel("τ = ?")
-        self.m_label = QLabel("m = ?")
+        self.tau_label.setStyleSheet("font-weight: bold; color: #268bd2;")
         params_layout.addRow("Time Delay:", self.tau_label)
+        
+        self.m_label = QLabel("m = ?")
+        self.m_label.setStyleSheet("font-weight: bold; color: #268bd2;")
         params_layout.addRow("Embedding Dimension:", self.m_label)
+        
+        # Manuel override (opsiyonel)
+        self.manual_tau_spin = QSpinBox()
+        self.manual_tau_spin.setRange(1, 100)
+        self.manual_tau_spin.setValue(10)
+        self.manual_tau_spin.setEnabled(False)
+        params_layout.addRow("Manuel τ:", self.manual_tau_spin)
+        
+        self.manual_m_spin = QSpinBox()
+        self.manual_m_spin.setRange(2, 20)
+        self.manual_m_spin.setValue(3)
+        self.manual_m_spin.setEnabled(False)
+        params_layout.addRow("Manuel m:", self.manual_m_spin)
+        
+        self.use_manual_check = QPushButton("Manuel Parametreleri Kullan")
+        self.use_manual_check.setCheckable(True)
+        self.use_manual_check.toggled.connect(self._toggle_manual)
+        params_layout.addRow("", self.use_manual_check)
         
         self.algo_combo = QComboBox()
         self.algo_combo.addItem("Wolf Algorithm", "wolf")
@@ -185,6 +207,11 @@ class ChaosAnalysisPanel(QWidget):
         self.m = m
         self.tau_label.setText(f"τ = {tau}")
         self.m_label.setText(f"m = {m}")
+        
+        # Manuel spinbox'lara da default değerleri set et
+        self.manual_tau_spin.setValue(tau)
+        self.manual_m_spin.setValue(m)
+        
         self.calc_lyap_button.setEnabled(True)
         self.calc_corr_button.setEnabled(True)
         self.calc_spec_button.setEnabled(True)
@@ -210,9 +237,10 @@ class ChaosAnalysisPanel(QWidget):
     def calculate_lyapunov(self):
         if not self._check_ready():
             return
+        tau, m = self._get_params()
         algo = self.algo_combo.currentData()
         self.worker = ChaosWorker(
-            self.current_data.data, self.tau, self.m,
+            self.current_data.data, tau, m,
             'lyapunov', algorithm=algo, dt=self.current_data.dt
         )
         self.worker.finished.connect(self.on_lyapunov_complete)
@@ -226,8 +254,9 @@ class ChaosAnalysisPanel(QWidget):
     def calculate_spectrum(self):
         if not self._check_ready():
             return
+        tau, m = self._get_params()
         self.worker = ChaosWorker(
-            self.current_data.data, self.tau, self.m,
+            self.current_data.data, tau, m,
             'spectrum', dt=self.current_data.dt
         )
         self.worker.finished.connect(self.on_spectrum_complete)
@@ -241,7 +270,8 @@ class ChaosAnalysisPanel(QWidget):
     def calculate_correlation_dim(self):
         if not self._check_ready():
             return
-        self.worker = ChaosWorker(self.current_data.data, self.tau, self.m, 'correlation_dim')
+        tau, m = self._get_params()
+        self.worker = ChaosWorker(self.current_data.data, tau, m, 'correlation_dim')
         self.worker.finished.connect(self.on_correlation_complete)
         self.worker.error.connect(self.on_error)
         self.worker.progress.connect(self.on_progress)
@@ -347,6 +377,21 @@ class ChaosAnalysisPanel(QWidget):
         return (self.current_data is not None and
                 self.tau is not None and
                 self.m is not None)
+    
+    def _toggle_manual(self, checked):
+        """Manuel parametre girişini aç/kapat"""
+        self.manual_tau_spin.setEnabled(checked)
+        self.manual_m_spin.setEnabled(checked)
+    
+    def _get_params(self):
+        """Aktif parametreleri al (otomatik veya manuel)"""
+        if self.use_manual_check.isChecked():
+            tau = self.manual_tau_spin.value()
+            m = self.manual_m_spin.value()
+        else:
+            tau = self.tau
+            m = self.m
+        return tau, m
     
     def refresh_ui(self):
         self.calc_lyap_button.setText(self.tm('btn_calculate') + ' Lyapunov')
