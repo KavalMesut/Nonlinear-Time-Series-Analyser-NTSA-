@@ -54,6 +54,15 @@ class DataTablePanel(QWidget):
 
         layout.addWidget(self.table)
 
+    def clear_table(self):
+        """Tabloyu temizle"""
+        self.table.setRowCount(0)
+        self.lbl_length.setText("-")
+        self.lbl_dt.setText("-")
+        self.lbl_duration.setText("-")
+        self.lbl_system.setText("-")
+        self.lbl_stats.setText("-")
+
     def set_data(self, timeseries):
         """TimeSeries verisini tabloya yukle"""
         data = timeseries.data

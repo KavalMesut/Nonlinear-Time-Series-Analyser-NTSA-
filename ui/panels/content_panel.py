@@ -146,6 +146,23 @@ class ContentPanel(QWidget):
             main_window.steps_panel.lock_step(5)
             main_window.steps_panel.lock_step(6)
 
+    def reset_all(self):
+        """Tüm panelleri sıfırla (yeni analiz için)"""
+        self.current_data = None
+        self.data_table.clear_table()
+        self.stacked_widget.setCurrentIndex(0)  # Data Load paneline dön
+        
+        # Her paneli sıfırla
+        if hasattr(self, 'parameter_panel'):
+            self.parameter_panel.tau = None
+            self.parameter_panel.m = None
+            self.parameter_panel.tau_result_label.setText("τ = ?")
+            self.parameter_panel.m_result_label.setText("m = ?")
+        
+        if hasattr(self, 'chaos_panel'):
+            self.chaos_panel.tau = None
+            self.chaos_panel.m = None
+
     def set_step(self, step_index):
         self.stacked_widget.setCurrentIndex(step_index)
 

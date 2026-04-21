@@ -34,6 +34,11 @@ class PlotPanel(QWidget):
         self._apply_theme(self.plot_widget)
         layout.addWidget(self.plot_widget)
 
+    def clear_plot(self):
+        """Grafiği temizle"""
+        self.plot_widget.clear()
+        self.title_label.setText("Grafik")
+
     def handle_plot(self, plot_data: dict):
         """ContentPanel'den gelen plot isteklerini isler"""
         ptype = plot_data.get('type', '')

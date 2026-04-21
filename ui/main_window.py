@@ -3,10 +3,11 @@ Main window for Nonlinear Time Series Analyzer
 """
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QMenuBar, QMenu, QStatusBar, QSplitter, QMessageBox
+    QMenuBar, QMenu, QStatusBar, QSplitter, QMessageBox, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction
+from pathlib import Path
 
 from .themes import ThemeManager
 from .translations import TranslationManager
@@ -14,6 +15,8 @@ from .panels.steps_panel import StepsPanel
 from .panels.content_panel import ContentPanel
 from .panels.plot_panel import PlotPanel
 from .dialogs.preferences_dialog import PreferencesDialog
+from core.session import AnalysisSession
+from core.export import export_timeseries_csv, export_plot_png, export_analysis_results_json
 
 
 class MainWindow(QMainWindow):
@@ -29,6 +32,10 @@ class MainWindow(QMainWindow):
         # Managers
         self.theme_manager = ThemeManager()
         self.translation_manager = TranslationManager(default_language='tr')
+        
+        # Session
+        self.current_session = AnalysisSession()
+        self.current_file_path = None  # Son kaydedilen .tsa dosya yolu
         
         # Initialize UI
         self.init_ui()
@@ -225,39 +232,187 @@ class MainWindow(QMainWindow):
     
     # Menu actions
     def new_analysis(self):
-        """Start new analysis"""
-        # TODO: Implement
-        self.status_bar.showMessage(self.tr('menu_file_new'))
+        """Yeni analiz başlat (mevcut session'ı sıfırla)"""
+        # Kaydedilmemiş değişiklikler varsa uyar
+        reply = QMessageBox.question(
+            self,
+            self.tr('menu_file_new'),
+            "Mevcut analiz sıfırlanacak. Devam edilsin mi?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self.current_session = AnalysisSession()
+            self.current_file_path = None
+            self.content_panel.reset_all()
+            self.plot_panel.clear_plot()
+            self.status_bar.showMessage("Yeni analiz başlatıldı")
     
     def open_file(self):
-        """Open file"""
-        # TODO: Implement
-        self.status_bar.showMessage(self.tr('menu_file_open'))
+        """Session dosyası aç (.tsa veya .json)"""
+        filepath, _ = QFileDialog.getOpenFileName(
+            self,
+            "Analiz Dosyası Aç",
+            str(Path.home()),
+            "TSA Files (*.tsa);;JSON Files (*.json);;All Files (*.*)"
+        )
+        
+        if filepath:
+            # .tsa → pickle, .json → JSON
+            if filepath.endswith('.tsa'):
+                session = AnalysisSession.load_pickle(filepath)
+            else:
+                session = AnalysisSession.load_json(filepath)
+            
+            if session:
+                self.current_session = session
+                self.current_file_path = filepath
+                self._restore_session(session)
+                self.status_bar.showMessage(f"Yüklendi: {Path(filepath).name}")
+            else:
+                QMessageBox.warning(self, "Hata", "Dosya yüklenemedi!")
     
     def save_analysis(self):
-        """Save analysis"""
-        # TODO: Implement
-        self.status_bar.showMessage(self.tr('menu_file_save'))
+        """Mevcut session'ı kaydet"""
+        if self.current_file_path:
+            # Varolan dosyaya kaydet
+            self._save_to_file(self.current_file_path)
+        else:
+            # İlk kayıt → "Save As" diyaloğu
+            self.save_analysis_as()
     
     def save_analysis_as(self):
-        """Save analysis as"""
-        # TODO: Implement
-        self.status_bar.showMessage(self.tr('menu_file_save_as'))
+        """Session'ı yeni dosyaya kaydet"""
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            "Analizi Kaydet",
+            str(Path.home() / "analysis.tsa"),
+            "TSA Files (*.tsa);;JSON Files (*.json);;All Files (*.*)"
+        )
+        
+        if filepath:
+            self._save_to_file(filepath)
+    
+    def _save_to_file(self, filepath: str):
+        """Session'ı dosyaya kaydet (internal)"""
+        # Session'ı güncelle
+        self._update_session_from_ui()
+        
+        # Uzantıya göre format seç
+        if filepath.endswith('.tsa'):
+            success = self.current_session.save_pickle(filepath)
+        else:
+            success = self.current_session.save_json(filepath)
+        
+        if success:
+            self.current_file_path = filepath
+            self.status_bar.showMessage(f"Kaydedildi: {Path(filepath).name}")
+        else:
+            QMessageBox.warning(self, "Hata", "Dosya kaydedilemedi!")
+    
+    def _update_session_from_ui(self):
+        """UI'dan session'a mevcut durumu aktar"""
+        # Timeseries
+        if self.content_panel.current_data:
+            self.current_session.set_timeseries(self.content_panel.current_data, is_original=False)
+        
+        # Parameters
+        if hasattr(self.content_panel, 'parameter_panel'):
+            tau = self.content_panel.parameter_panel.tau
+            m = self.content_panel.parameter_panel.m
+            if tau and m:
+                self.current_session.set_parameters(tau, m)
+        
+        # Analysis results (her panelden topla)
+        # TODO: Her panel kendi sonuçlarını session'a yazsın
+    
+    def _restore_session(self, session: AnalysisSession):
+        """Session'dan UI'ya verileri yükle"""
+        # Timeseries'i content panel'e yükle
+        if session.timeseries:
+            self.content_panel.on_data_loaded(session.timeseries)
+        
+        # Parameters'ı set et
+        if session.tau and session.m:
+            if hasattr(self.content_panel, 'parameter_panel'):
+                self.content_panel.parameter_panel.tau = session.tau
+                self.content_panel.parameter_panel.m = session.m
+                self.content_panel.parameter_panel.tau_result_label.setText(f"τ = {session.tau}")
+                self.content_panel.parameter_panel.m_result_label.setText(f"m = {session.m}")
+        
+        # TODO: Analysis results'ları restore et
     
     def export_csv(self):
-        """Export as CSV"""
-        # TODO: Implement
-        self.status_bar.showMessage(self.tr('export_csv'))
+        """Mevcut zaman serisini CSV olarak dışa aktar"""
+        if not self.content_panel.current_data:
+            QMessageBox.warning(self, "Uyarı", "Dışa aktarılacak veri yok!")
+            return
+        
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            "CSV Olarak Dışa Aktar",
+            str(Path.home() / "timeseries.csv"),
+            "CSV Files (*.csv);;All Files (*.*)"
+        )
+        
+        if filepath:
+            success = export_timeseries_csv(
+                self.content_panel.current_data,
+                filepath,
+                include_metadata=True
+            )
+            if success:
+                self.status_bar.showMessage(f"CSV dışa aktarıldı: {Path(filepath).name}")
+            else:
+                QMessageBox.warning(self, "Hata", "CSV dışa aktarılamadı!")
     
     def export_png(self):
-        """Export as PNG"""
-        # TODO: Implement
-        self.status_bar.showMessage(self.tr('export_png'))
+        """Mevcut grafiği PNG olarak dışa aktar"""
+        if not self.plot_panel.plot_widget:
+            QMessageBox.warning(self, "Uyarı", "Dışa aktarılacak grafik yok!")
+            return
+        
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            "PNG Olarak Dışa Aktar",
+            str(Path.home() / "plot.png"),
+            "PNG Files (*.png);;All Files (*.*)"
+        )
+        
+        if filepath:
+            success = export_plot_png(
+                self.plot_panel.plot_widget,
+                filepath,
+                width=1920,
+                height=1080
+            )
+            if success:
+                self.status_bar.showMessage(f"PNG dışa aktarıldı: {Path(filepath).name}")
+            else:
+                QMessageBox.warning(self, "Hata", "PNG dışa aktarılamadı!")
     
     def export_json(self):
-        """Export as JSON"""
-        # TODO: Implement
-        self.status_bar.showMessage(self.tr('export_json'))
+        """Analiz sonuçlarını JSON olarak dışa aktar"""
+        # Session'daki tüm sonuçları JSON'a dök
+        self._update_session_from_ui()
+        
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            "JSON Olarak Dışa Aktar",
+            str(Path.home() / "analysis_results.json"),
+            "JSON Files (*.json);;All Files (*.*)"
+        )
+        
+        if filepath:
+            success = export_analysis_results_json(
+                self.current_session.to_dict(),
+                filepath
+            )
+            if success:
+                self.status_bar.showMessage(f"JSON dışa aktarıldı: {Path(filepath).name}")
+            else:
+                QMessageBox.warning(self, "Hata", "JSON dışa aktarılamadı!")
     
     def show_preferences(self):
         """Show preferences dialog"""
