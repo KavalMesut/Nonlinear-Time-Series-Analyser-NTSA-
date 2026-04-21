@@ -83,8 +83,8 @@ class PlotPanel(QWidget):
 
         self.vsplitter.addWidget(bottom_widget)
 
-        # Split oranlari: %60 ust, %40 alt
-        self.vsplitter.setSizes([600, 400])
+        # Split oranlari: %50 ust, %50 alt
+        self.vsplitter.setSizes([500, 500])
 
         layout.addWidget(self.vsplitter)
 
@@ -443,7 +443,7 @@ class PlotPanel(QWidget):
     def _plot_embedding_3d(self, d, widget, title_label):
         """3D Faz Uzayı: x(t), x(t+τ), x(t+2τ)"""
         # PyQtGraph 2D plot widget'ında 3D gösteremeyiz
-        # Bunun yerine 3 projection gösterelim veya mesaj verelim
+        # Bunun yerine XY projection göster, Z'yi renk olarak kodla
         widget.clear()
         widget.setLogMode(y=False)
         tau = d.get('tau', '?')
@@ -461,18 +461,20 @@ class PlotPanel(QWidget):
             # Z değerini renge kodla (color-coded)
             z_norm = (z - z.min()) / (z.max() - z.min() + 1e-10)
             
-            # Gradient: mavi -> kırmızı
+            # Gradient: mavi -> kırmızı (RGB kullan)
+            # Mavi (0, 0, 255) -> Kırmızı (255, 0, 0)
             colors = []
             for zn in z_norm:
-                # HSV color: hue 240 (blue) -> 0 (red)
-                hue = int(240 * (1 - zn))
-                colors.append(pg.mkBrush(f'hsv({hue}, 255, 200)'))
+                r = int(255 * zn)
+                b = int(255 * (1 - zn))
+                # QColor veya (R, G, B, A) tuple
+                colors.append((r, 0, b, 150))  # Alpha=150 (yarı saydam)
             
             # Scatter plot with color coding
             scatter = pg.ScatterPlotItem(
                 x=x, y=y, 
                 size=3, 
-                brush=colors,
+                brush=colors,  # Liste olarak renk ver
                 pen=None
             )
             widget.addItem(scatter)
