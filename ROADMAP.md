@@ -491,6 +491,58 @@ Negatif test:
 6\. export
 
 
+Sıra değiştirme.
+
+
+\---
+
+## GELECEK GÖREVLER (TODO)
+
+### Yüksek Öncelik
+- [ ] PyInstaller ile .exe paketleme
+  - Windows için standalone executable
+  - Tüm bağımlılıkları dahil et (scipy, PySide6, pyqtgraph)
+  - İkon ve metadata ekle
+  
+- [ ] Kullanıcı Dokümantasyonu
+  - Nasıl kullanılır kılavuzu (Türkçe + İngilizce)
+  - Her analiz adımı için açıklamalar
+  - Screenshot'lar ile örnek workflow
+  - PDF export
+
+### Orta Öncelik
+- [ ] Embedding Visualization (Step 5)
+  - 2D/3D phase space plot
+  - Poincaré kesitleri
+  
+- [ ] Results Summary Panel (Step 7)
+  - Tüm sonuçların özeti
+  - Karşılaştırma tablosu
+  - Export to LaTeX table
+
+### Düşük Öncelik
+- [ ] Batch Processing
+  - Birden fazla dosya üzerinde otomatik analiz
+  - Sonuçları CSV/Excel tablosuna export
+  
+- [ ] Advanced Preprocessing
+  - Adaptive filtering
+  - Signal decomposition (EMD, VMD)
+
+\---
+
+
+2\. pipeline
+
+3\. analizler
+
+4\. doğrulama
+
+5\. ui
+
+6\. export
+
+
 
 Sıra değiştirme.
 

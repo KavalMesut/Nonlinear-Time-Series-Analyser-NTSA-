@@ -5,11 +5,13 @@ Kaotik zaman serilerinin doğrusal olmayan analizi icin gelistirilmis masaustu u
 ## Ozellikler
 
 - **10 Kaotik Sistem Ureteci**: Lorenz, Rossler, Chua, Chen, Duffing, Logistic, Henon, Tent, Sine, Ikeda
+- **12 Preprocessing Fonksiyonu**: Normalize, detrend, outlier removal, smooth, difference, resample, filter, log/boxcox transform, windowing, denoise
 - **Otomatik Parametre Tahmini**: AMI (gecikme suresi tau) ve FNN (gomme boyutu m) ile veri tabanli parametre secimi
 - **Wolf Lyapunov Algoritmasi**: Orijinal MATLAB koduna sadik implementasyon (KD-Tree tabanli komsu arama)
 - **Rosenstein Lyapunov Algoritmasi**: Otomatik egri uydurmali (auto-fit) en buyuk Lyapunov usteli hesaplama
 - **Korelasyon Boyutu**: Grassberger-Procaccia algoritmasi
 - **Dogrusal Analizler**: ACF, PACF, FFT (Hann/Hamming/Blackman pencerele)
+- **Export/Session Yönetimi**: CSV/PNG/JSON export, analiz durumunu kaydet/yükle (.tsa/.json)
 - **Pipeline Motoru**: Bagimlilik cozumlemeli, onbellekli analiz zinciri
 - **PySide6 Arayuz**: PyQtGraph tabanli gorselleestirme
 - **Performans**: scipy KD-Tree, vektorize islemler (~43 saniye / 10 sistem validasyonu)
@@ -82,7 +84,10 @@ tseriesanalyser/
 │   ├── timeseries.py       # TimeSeries sinifi
 │   ├── generators.py       # 10 kaotik sistem ureteci
 │   ├── integrators.py      # RK4 integrator + ODE sistemleri
-│   └── loaders.py          # CSV/TXT dosya yukleyici
+│   ├── loaders.py          # CSV/TXT dosya yukleyici
+│   ├── preprocessing.py    # 12 preprocessing fonksiyonu
+│   ├── export.py           # CSV/PNG/JSON export
+│   └── session.py          # Analiz oturumu kaydet/yükle
 ├── analysis/               # Analiz algoritmalari
 │   ├── ami.py              # Ortalama Karsilikli Bilgi (tau tahmini)
 │   ├── fnn.py              # Yanlis En Yakin Komsular (m tahmini)
@@ -97,12 +102,46 @@ tseriesanalyser/
 │   └── engine.py           # Pipeline calistiricisi
 ├── ui/                     # PySide6 kullanici arayuzu
 ├── tests/                  # Validasyon testleri
-│   └── test_validation.py  # 10 sistem validasyon scripti
+│   ├── test_validation.py         # 10 sistem bilimsel validasyon
+│   ├── test_wolf_matlab_match.py  # Wolf MATLAB uyumluluk testi
+│   └── test_preprocessing_workflow.py  # Preprocessing & UI testleri
 ├── examples/               # Ornek scriptler
 ├── documents/              # Wolf MATLAB referans dosyalari
 ├── main.py                 # Uygulama giris noktasi
 ├── ROADMAP.md              # Proje spesifikasyonu
 └── requirements.txt        # Bagimliliklar
+```
+
+## Export ve Session Yönetimi
+
+### Export Özellikleri
+- **CSV Export**: Zaman serisi verilerini metadata ile birlikte dışa aktar
+- **PNG Export**: Grafikleri yüksek çözünürlükte (1920x1080) kaydet
+- **JSON Export**: Tüm analiz sonuçlarını taşınabilir formatta dışa aktar
+
+### Session Management
+- **Kaydet (.tsa)**: Binary pickle format — hızlı ve kompakt
+- **Kaydet (.json)**: Human-readable JSON — taşınabilir, metin tabanlı
+- **Session İçeriği**:
+  - Zaman serisi verisi (orijinal + işlenmiş)
+  - Parametreler (tau, m)
+  - Tüm analiz sonuçları (AMI, FNN, ACF, Lyapunov, vb.)
+  - Preprocessing geçmişi (hangi işlemler uygulandı)
+  - Metadata ve timestamp'ler
+
+### Kullanım
+```python
+# Session oluştur ve kaydet
+from core.session import AnalysisSession
+
+session = AnalysisSession()
+session.set_timeseries(my_timeseries)
+session.set_parameters(tau=10, m=3)
+session.save_pickle("my_analysis.tsa")  # veya .json
+
+# Session yükle
+loaded = AnalysisSession.load_pickle("my_analysis.tsa")
+print(loaded.tau, loaded.m)
 ```
 
 ## Teknik Notlar
