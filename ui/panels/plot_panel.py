@@ -120,6 +120,12 @@ class PlotPanel(QWidget):
             self._plot_chaos_correlation(plot_data, self.top_plot_widget, self.top_title_label)
         elif ptype == 'preprocessing':
             self._plot_preprocessing(plot_data, self.top_plot_widget, self.top_title_label)
+        elif ptype == 'embedding_2d':
+            self._plot_embedding_2d(plot_data, self.top_plot_widget, self.top_title_label)
+        elif ptype == 'embedding_3d':
+            self._plot_embedding_3d(plot_data, self.top_plot_widget, self.top_title_label)
+        elif ptype == 'return_map':
+            self._plot_return_map(plot_data, self.top_plot_widget, self.top_title_label)
 
         # Auto-range (grafigi tam ekrana sigdir)
         self.top_plot_widget.autoRange()
@@ -171,6 +177,14 @@ class PlotPanel(QWidget):
         elif ptype == 'preprocessing':
             op = plot_data.get('operation', 'Unknown')
             return f"Preprocessing: {op}"
+        elif ptype == 'embedding_2d':
+            tau = plot_data.get('tau', '?')
+            return f"2D Faz Uzayı (τ={tau})"
+        elif ptype == 'embedding_3d':
+            tau = plot_data.get('tau', '?')
+            return f"3D Faz Uzayı (τ={tau})"
+        elif ptype == 'return_map':
+            return "Geri Dönüş Haritası"
         else:
             return f"Plot ({ptype})"
 
@@ -241,6 +255,12 @@ class PlotPanel(QWidget):
             self._plot_chaos_correlation(plot_data, widget, title_label)
         elif ptype == 'preprocessing':
             self._plot_preprocessing(plot_data, widget, title_label)
+        elif ptype == 'embedding_2d':
+            self._plot_embedding_2d(plot_data, widget, title_label)
+        elif ptype == 'embedding_3d':
+            self._plot_embedding_3d(plot_data, widget, title_label)
+        elif ptype == 'return_map':
+            self._plot_return_map(plot_data, widget, title_label)
 
     # ------------------------------------------------------------------
     # PLOT FUNCTIONS (her biri artik widget + title_label alir)
@@ -394,6 +414,102 @@ class PlotPanel(QWidget):
         widget.plot(d['time_processed'], d['data_processed'],
                     pen=pg.mkPen(color='#0e639c', width=1.5),
                     name='Processed')
+
+    def _plot_embedding_2d(self, d, widget, title_label):
+        """2D Faz Uzayı: x(t) vs x(t+τ)"""
+        widget.clear()
+        widget.setLogMode(y=False)
+        tau = d.get('tau', '?')
+        title_label.setText(f"2D Faz Uzayı (τ={tau})")
+        widget.setLabel('left', f'x(t+{tau})')
+        widget.setLabel('bottom', 'x(t)')
+        
+        x = d['x']
+        y = d['y']
+        
+        # Scatter plot (trajectory)
+        widget.plot(x, y, pen=pg.mkPen(color='#0e639c', width=1.5))
+        
+        # İlk nokta (başlangıç) kırmızı
+        widget.plot([x[0]], [y[0]], 
+                    pen=None, symbol='o', symbolSize=8, 
+                    symbolBrush='#dc322f', name='Start')
+        
+        # Son nokta (bitiş) yeşil
+        widget.plot([x[-1]], [y[-1]], 
+                    pen=None, symbol='s', symbolSize=8, 
+                    symbolBrush='#859900', name='End')
+
+    def _plot_embedding_3d(self, d, widget, title_label):
+        """3D Faz Uzayı: x(t), x(t+τ), x(t+2τ)"""
+        # PyQtGraph 2D plot widget'ında 3D gösteremeyiz
+        # Bunun yerine 3 projection gösterelim veya mesaj verelim
+        widget.clear()
+        widget.setLogMode(y=False)
+        tau = d.get('tau', '?')
+        title_label.setText(f"3D Faz Uzayı (τ={tau}) - 2D İzdüşüm")
+        
+        x = d['x']
+        y = d['y']
+        z = d.get('z')
+        
+        if z is not None:
+            # XY projection göster
+            widget.setLabel('left', f'x(t+{tau})')
+            widget.setLabel('bottom', 'x(t)')
+            
+            # Z değerini renge kodla (color-coded)
+            z_norm = (z - z.min()) / (z.max() - z.min() + 1e-10)
+            
+            # Gradient: mavi -> kırmızı
+            colors = []
+            for zn in z_norm:
+                # HSV color: hue 240 (blue) -> 0 (red)
+                hue = int(240 * (1 - zn))
+                colors.append(pg.mkBrush(f'hsv({hue}, 255, 200)'))
+            
+            # Scatter plot with color coding
+            scatter = pg.ScatterPlotItem(
+                x=x, y=y, 
+                size=3, 
+                brush=colors,
+                pen=None
+            )
+            widget.addItem(scatter)
+            
+            # Başlangıç/bitiş noktaları
+            widget.plot([x[0]], [y[0]], 
+                        pen=None, symbol='o', symbolSize=10, 
+                        symbolBrush='#dc322f', name='Start')
+            widget.plot([x[-1]], [y[-1]], 
+                        pen=None, symbol='s', symbolSize=10, 
+                        symbolBrush='#859900', name='End')
+
+    def _plot_return_map(self, d, widget, title_label):
+        """Geri Dönüş Haritası: x(t) vs x(t+1)"""
+        widget.clear()
+        widget.setLogMode(y=False)
+        title_label.setText("Geri Dönüş Haritası")
+        widget.setLabel('left', 'x(t+1)')
+        widget.setLabel('bottom', 'x(t)')
+        
+        x = d['x']
+        y = d['y']
+        
+        # Scatter plot
+        scatter = pg.ScatterPlotItem(
+            x=x, y=y,
+            size=2,
+            pen=pg.mkPen(None),
+            brush=pg.mkBrush('#268bd2')
+        )
+        widget.addItem(scatter)
+        
+        # Diagonal line (y=x)
+        x_range = [x.min(), x.max()]
+        widget.plot(x_range, x_range, 
+                    pen=pg.mkPen('#dc322f', style=Qt.DashLine, width=1),
+                    name='y=x')
 
     # ------------------------------------------------------------------
     def update_plot_theme(self):

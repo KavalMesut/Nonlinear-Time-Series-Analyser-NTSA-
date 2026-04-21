@@ -48,7 +48,7 @@ class Translations:
         'step_preprocessing': {'tr': '2. Ön İşleme', 'en': '2. Preprocessing'},
         'step_linear_analysis': {'tr': '3. Lineer Analiz', 'en': '3. Linear Analysis'},
         'step_parameter_estimation': {'tr': '4. Parametre Tahmini', 'en': '4. Parameter Estimation'},
-        'step_embedding': {'tr': '5. Gömme (Embedding)', 'en': '5. Embedding'},
+        'step_phase_space': {'tr': '5. Faz Uzayı', 'en': '5. Phase Space'},
         'step_chaos_analysis': {'tr': '6. Kaos Analizi', 'en': '6. Chaos Analysis'},
         'step_results': {'tr': '7. Sonuçlar', 'en': '7. Results'},
         

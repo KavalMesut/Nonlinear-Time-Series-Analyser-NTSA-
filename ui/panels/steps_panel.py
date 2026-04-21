@@ -48,7 +48,7 @@ class StepsPanel(QWidget):
             ('step_preprocessing', False),
             ('step_linear_analysis', False),
             ('step_parameter_estimation', False),
-            ('step_embedding', False),
+            ('step_phase_space', False),
             ('step_chaos_analysis', False),
             ('step_results', False)
         ]

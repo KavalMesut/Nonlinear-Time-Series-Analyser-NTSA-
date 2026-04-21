@@ -13,6 +13,7 @@ from .data_table_panel import DataTablePanel
 from .preprocessing_panel import PreprocessingPanel
 from .linear_analysis_panel import LinearAnalysisPanel
 from .parameter_estimation_panel import ParameterEstimationPanel
+from .embedding_panel import EmbeddingPanel
 from .chaos_analysis_panel import ChaosAnalysisPanel
 
 
@@ -61,10 +62,10 @@ class ContentPanel(QWidget):
         self.parameter_panel.plot_requested.connect(self._forward_plot)
         self.stacked_widget.addWidget(self.parameter_panel)
 
-        # 4 — Embedding (placeholder)
-        placeholder5 = QLabel("Step 5: Embedding Visualization\n\nComing soon...")
-        placeholder5.setAlignment(Qt.AlignCenter)
-        self.stacked_widget.addWidget(placeholder5)
+        # 4 — Phase Space (Embedding Visualization)
+        self.embedding_panel = EmbeddingPanel(self.tm)
+        self.embedding_panel.plot_requested.connect(self._forward_plot)
+        self.stacked_widget.addWidget(self.embedding_panel)
 
         # 5 — Chaos Analysis
         self.chaos_panel = ChaosAnalysisPanel(self.tm)
@@ -125,6 +126,11 @@ class ContentPanel(QWidget):
             if hasattr(main_window, 'steps_panel'):
                 main_window.steps_panel.unlock_step(4)
                 main_window.steps_panel.unlock_step(5)
+            
+            # Embedding panel'e parametreleri gönder
+            self.embedding_panel.set_data(self.current_data, tau, m)
+            
+            # Chaos panel'e parametreleri gönder
             self.chaos_panel.set_data(self.current_data, tau, m)
 
     def on_chaos_analysis_complete(self, results):
