@@ -43,22 +43,26 @@ class DataLoadPanel(QWidget):
                 border: 1px solid #555555;
                 border-radius: 5px;
                 padding: 8px 16px;
+                padding-left: 16px;
                 font-size: 10pt;
                 color: #cccccc;
+                text-align: center;
             }
             QRadioButton:hover {
                 background-color: #4a4a4a;
                 border-color: #666666;
             }
             QRadioButton:checked {
-                background-color: #90ee90;
-                color: #000000;
-                border-color: #70ce70;
+                background-color: #50C878;
+                color: #ffffff;
+                border-color: #3fa862;
                 font-weight: bold;
             }
             QRadioButton::indicator {
-                width: 0px;
-                height: 0px;
+                width: 0;
+                height: 0;
+                border: none;
+                background: none;
             }
         """
         self.file_radio.setStyleSheet(radio_style)
