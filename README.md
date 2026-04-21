@@ -121,19 +121,23 @@ python tests/test_validation.py
 ```
 Literatür referanslarına göre Wolf, Rosenstein ve Kantz algoritmalarını 10 kaotik sistem üzerinde doğrular.
 
-### MATLAB Uyumluluk Testi (Wolf Lorenz)
+### MATLAB Uyumluluk Testleri (Wolf)
 ```bash
-python tests/test_wolf_lorenz_matlab_match.py
+python tests/test_wolf_matlab_match.py
 ```
-Wolf'un orijinal MATLAB kodunun (`testbench.m`) Python çevirisini doğrular. Wolf'un kendi Data2.lor verisini (16384 nokta Lorenz) birebir aynı parametrelerle (`tau=10, m=3, dt=0.01, evolve=20, dismin=0.001, dismax=0.3, thmax=30°`) çalıştırır.
+Wolf'un orijinal MATLAB kodunun Python çevirisini doğrular. İki test:
 
-**Sonuç:** Python: 2.01 bits/s | MATLAB beklenen: ~2.1 bits/s | **Fark: %4.1**
+**Test #1: Lorenz (Data2.lor)**
+- Wolf'un kendi Data2.lor verisi (16384 nokta, σ=10, ρ=28, β=8/3)
+- Parametreler: `tau=10, m=3, dt=0.01, evolve=20`
+- Sonuç: Python 2.01 bits/s | Wolf ~2.1 bits/s | **Fark: %4.1**
 
-%4.1 fark, nearest neighbor search implementasyonu farklılığından kaynaklanır:
-- MATLAB: Box-grid spatial indexing (basgen.m)
-- Python: scipy KDTree
+**Test #2: Logistic Map**
+- 512 iterasyon, x(n+1) = 4x(n)(1-x(n))
+- Parametreler: `tau=1, m=2, evolve=3`
+- Sonuç: Python 1.00 bits/iter | Wolf 0.98 | Theory 1.0 | **Fark: %2.2 (Wolf), %0.1 (Teori)**
 
-Wolf dokümantasyonu da "approximately 2.1 bits/second" ifadesini kullanır. %4.1 fark kabul edilebilir doğruluk seviyesidir.
+Farklar, nearest neighbor search implementasyonu farklılığından kaynaklanır (MATLAB box-grid vs Python KDTree). Wolf dokümantasyonu "approximately" ifadesini kullanır; %2-4 fark kabul edilebilir doğruluk seviyesidir.
 
 ## Lisans
 

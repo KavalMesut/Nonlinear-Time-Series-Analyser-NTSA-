@@ -1,9 +1,0 @@
-Wolf MATLAB -> Python Dogrulama
-==================================================
-Veri:     Data2.lor (16384 nokta)
-Params:   tau=10, m=3, dt=0.01, evolve=20
-Python:   2.0137 bits/s (1.3958 nats/s)
-MATLAB:   ~2.1 bits/s
-Fark:     4.1%
-Iters:    817
-Sonuc:    BASARILI
