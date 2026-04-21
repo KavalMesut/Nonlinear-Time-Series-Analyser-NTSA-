@@ -113,31 +113,51 @@ tseriesanalyser/
 - **LE stabilite testi**: m+-1 ve tau+-10% varyasyonlari ile hesaplanan CV (varyasyon katsayisi) < 0.20 ise sonuc guvenilir kabul edilir. 8/10 sistemde stabil.
 - **KD-Tree** (scipy.spatial.cKDTree) komsu aramalarinda kullanilir (Wolf ve Rosenstein).
 
-## Validasyon Testlerini Calistirma
+## Validasyon ve Test Stratejisi
 
-### Bilimsel Dogrulama (10 Sistem)
+Bu proje iki seviyeli doğrulama yaklaşımı kullanır:
+
+### 1. Bilimsel Doğrulama (test_validation.py)
+**Amaç:** Algoritmaların literatür referanslarına uygunluğunu test etmek.
+
 ```bash
 python tests/test_validation.py
 ```
-Literatür referanslarına göre Wolf, Rosenstein ve Kantz algoritmalarını 10 kaotik sistem üzerinde doğrular.
 
-### MATLAB Uyumluluk Testleri (Wolf)
+- **10 kaotik sistem** üzerinde Wolf, Rosenstein ve Kantz algoritmalarını test eder
+- **Literatür LE değerleri** ile karşılaştırır (örn: Lorenz 0.9056 nats/s)
+- **Veri-tabanlı parametre seçimi** kullanır (AMI + FNN ile tau ve m otomatik bulunur)
+- **Stabilite analizi** yapar (m±1, tau±10% varyasyonları ile CV<0.20 kontrolü)
+- **Sonuç:** 7/10 sistem <%10 hata, 10/10 sistem <%20 hata
+
+**Neden gerekli?** Algoritmaların bilimsel olarak doğru çalıştığını ve farklı dinamik sistemlerde güvenilir sonuçlar verdiğini gösterir.
+
+### 2. MATLAB Uyumluluk Testleri (test_wolf_matlab_match.py)
+**Amaç:** Wolf'un orijinal MATLAB kodunun Python'a doğru çevrildiğini kanıtlamak.
+
 ```bash
 python tests/test_wolf_matlab_match.py
 ```
-Wolf'un orijinal MATLAB kodunun Python çevirisini doğrular. İki test:
 
 **Test #1: Lorenz (Data2.lor)**
 - Wolf'un kendi Data2.lor verisi (16384 nokta, σ=10, ρ=28, β=8/3)
-- Parametreler: `tau=10, m=3, dt=0.01, evolve=20`
-- Sonuç: Python 2.01 bits/s | Wolf ~2.1 bits/s | **Fark: %4.1**
+- **Birebir aynı parametreler:** `tau=10, m=3, dt=0.01, evolve=20, dismin=0.001, dismax=0.3, thmax=30°`
+- **Sonuç:** Python 2.01 bits/s | Wolf ~2.1 bits/s | **Fark: %4.1** ✅
 
 **Test #2: Logistic Map**
 - 512 iterasyon, x(n+1) = 4x(n)(1-x(n))
-- Parametreler: `tau=1, m=2, evolve=3`
-- Sonuç: Python 1.00 bits/iter | Wolf 0.98 | Theory 1.0 | **Fark: %2.2 (Wolf), %0.1 (Teori)**
+- **Birebir aynı parametreler:** `tau=1, m=2, evolve=3, dismin=0.0001, dismax=0.05`
+- **Sonuç:** Python 1.00 bits/iter | Wolf 0.98 | Theory 1.0 | **Fark: %2.2 (Wolf), %0.1 (Teori)** ✅
 
-Farklar, nearest neighbor search implementasyonu farklılığından kaynaklanır (MATLAB box-grid vs Python KDTree). Wolf dokümantasyonu "approximately" ifadesini kullanır; %2-4 fark kabul edilebilir doğruluk seviyesidir.
+**Neden gerekli?** 
+- Wolf algoritması MATLAB'dan Python'a çevrildi — çevirinin doğruluğunu garantilemek gerekli
+- %2-4 fark kabul edilebilir: nearest neighbor search implementasyonu farklı (MATLAB box-grid vs Python KDTree)
+- Wolf dokümantasyonu "approximately" ifadesini kullanır
+- Test #2'de teorik değere %0.1 hata → algoritma matematiği doğru
+
+**İki test arasındaki fark:**
+- `test_validation.py` → **Bilimsel doğruluk** (literatür ile karşılaştırma, veri-tabanlı parametre)
+- `test_wolf_matlab_match.py` → **Implementasyon doğruluğu** (MATLAB kodu ile karşılaştırma, sabit parametre)
 
 ## Lisans
 
