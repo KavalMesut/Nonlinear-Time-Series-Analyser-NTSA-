@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem, QFrame
 )
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon, QFont
+from PySide6.QtGui import QIcon, QFont, QBrush, QColor
 
 
 class StepsPanel(QWidget):
@@ -45,20 +45,18 @@ class StepsPanel(QWidget):
         # Apply custom styling
         self.steps_list.setStyleSheet("""
             QListWidget {
-                font-size: 14pt;
+                font-size: 12pt;
                 padding: 5px;
             }
             QListWidget::item {
-                padding: 12px;
-                margin: 4px;
-                border-radius: 6px;
+                padding: 8px;
+                margin: 2px;
+                border-radius: 4px;
                 border: 2px solid transparent;
             }
             QListWidget::item:selected {
                 background-color: #1e5a8e;
                 border: 2px solid #2a7ab8;
-                /* Inset shadow effect for pressed look */
-                box-shadow: inset 0px 3px 6px rgba(0, 0, 0, 0.4);
             }
             QListWidget::item:hover:!selected {
                 background-color: #2a4a5e;
@@ -128,13 +126,15 @@ class StepsPanel(QWidget):
             item.setFlags(item.flags() | Qt.ItemIsEnabled)
     
     def mark_step_completed(self, index):
-        """Mark a step as completed (green color)"""
+        """Mark a step as completed (add checkmark)"""
         if index >= 0 and index < len(self.steps):
             self.completed_steps.add(index)
             item = self.steps_list.item(index)
-            # Set green background for completed step
-            item.setBackground(Qt.darkGreen)
-            item.setForeground(Qt.white)
+            
+            # Prepend a checkmark to indicate completion
+            current_text = item.text()
+            if not current_text.startswith("✓ "):
+                item.setText("✓ " + current_text)
     
     def lock_step(self, index):
         """Lock a step"""
