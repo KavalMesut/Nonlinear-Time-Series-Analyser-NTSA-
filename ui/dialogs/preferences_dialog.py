@@ -36,6 +36,10 @@ class PreferencesDialog(QDialog):
         self.setMinimumWidth(600)
         self.setMinimumHeight(500)
         
+        # Apply current theme stylesheet to dialog
+        current_theme = self.theme_manager.get_theme()
+        self.setStyleSheet(current_theme.get_stylesheet())
+        
         layout = QVBoxLayout(self)
         
         # Create tab widget

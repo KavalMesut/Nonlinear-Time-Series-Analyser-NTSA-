@@ -117,59 +117,31 @@ class DarkTheme(Theme):
             }}
             
             QSpinBox, QDoubleSpinBox {{
-                padding-right: 18px;
+                padding-right: 15px;
             }}
             
             QSpinBox::up-button, QDoubleSpinBox::up-button {{
                 subcontrol-origin: border;
                 subcontrol-position: top right;
-                width: 16px;
+                width: 15px;
                 border-left: 1px solid {self.colors['border']};
-                border-top-right-radius: 2px;
-                background-color: {self.colors['background_tertiary']};
-            }}
-            
-            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
                 background-color: {self.colors['background_secondary']};
             }}
             
-            QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed {{
+            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
                 background-color: {self.colors['accent']};
-            }}
-            
-            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-                width: 0;
-                height: 0;
-                border-left: 3px solid transparent;
-                border-right: 3px solid transparent;
-                border-bottom: 4px solid {self.colors['foreground']};
-                margin: 2px;
             }}
             
             QSpinBox::down-button, QDoubleSpinBox::down-button {{
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
-                width: 16px;
+                width: 15px;
                 border-left: 1px solid {self.colors['border']};
-                border-bottom-right-radius: 2px;
-                background-color: {self.colors['background_tertiary']};
-            }}
-            
-            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
                 background-color: {self.colors['background_secondary']};
             }}
             
-            QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {{
+            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
                 background-color: {self.colors['accent']};
-            }}
-            
-            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-                width: 0;
-                height: 0;
-                border-left: 3px solid transparent;
-                border-right: 3px solid transparent;
-                border-top: 4px solid {self.colors['foreground']};
-                margin: 2px;
             }}
             
             QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
