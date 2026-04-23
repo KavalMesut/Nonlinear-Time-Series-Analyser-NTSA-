@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox, QPushButton, QGroupBox, QFormLayout,
     QSpinBox, QSlider, QCheckBox, QColorDialog, QTabWidget, QWidget
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QColor
 
 
@@ -21,6 +21,13 @@ class PreferencesDialog(QDialog):
         self.theme_manager = theme_manager
         self.tm = translation_manager
         self.plot_settings = plot_settings
+        
+        # Throttle timer for live updates
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.setInterval(100)  # 100ms delay
+        self.update_timer.timeout.connect(self._apply_and_emit)
+        
         self.init_ui()
     
     def init_ui(self):
@@ -94,6 +101,9 @@ class PreferencesDialog(QDialog):
         self.line_width_spin = QSpinBox()
         self.line_width_spin.setRange(1, 5)
         self.line_width_spin.setValue(self.plot_settings.get('line_width'))
+        self.line_width_spin.setWrapping(False)
+        self.line_width_spin.setButtonSymbols(QSpinBox.UpDownArrows)
+        self.line_width_spin.setMinimumWidth(80)
         self.line_width_spin.setSuffix(" px")
         self.line_width_spin.valueChanged.connect(self.on_plot_setting_changed)
         line_layout.addRow("Çizgi Kalınlığı:", self.line_width_spin)
@@ -110,6 +120,7 @@ class PreferencesDialog(QDialog):
         self.scatter_size_spin.setRange(2, 10)
         self.scatter_size_spin.setValue(self.plot_settings.get('scatter_size'))
         self.scatter_size_spin.setSuffix(" px")
+        self.scatter_size_spin.setMinimumWidth(80)
         self.scatter_size_spin.valueChanged.connect(self.on_plot_setting_changed)
         scatter_layout.addRow("Nokta Boyutu:", self.scatter_size_spin)
         
@@ -158,6 +169,7 @@ class PreferencesDialog(QDialog):
         self.font_size_spin.setRange(8, 16)
         self.font_size_spin.setValue(self.plot_settings.get('font_size'))
         self.font_size_spin.setSuffix(" pt")
+        self.font_size_spin.setMinimumWidth(80)
         self.font_size_spin.valueChanged.connect(self.on_plot_setting_changed)
         axis_layout.addRow("Font Boyutu:", self.font_size_spin)
         
@@ -173,6 +185,7 @@ class PreferencesDialog(QDialog):
         self.scatter_3d_size_spin.setRange(1, 8)
         self.scatter_3d_size_spin.setValue(self.plot_settings.get('scatter_3d_size'))
         self.scatter_3d_size_spin.setSuffix(" px")
+        self.scatter_3d_size_spin.setMinimumWidth(80)
         self.scatter_3d_size_spin.valueChanged.connect(self.on_plot_setting_changed)
         d3_layout.addRow("3D Nokta Boyutu:", self.scatter_3d_size_spin)
         
@@ -181,6 +194,7 @@ class PreferencesDialog(QDialog):
         self.trajectory_3d_width_spin.setRange(1, 5)
         self.trajectory_3d_width_spin.setValue(self.plot_settings.get('trajectory_3d_width'))
         self.trajectory_3d_width_spin.setSuffix(" px")
+        self.trajectory_3d_width_spin.setMinimumWidth(80)
         self.trajectory_3d_width_spin.valueChanged.connect(self.on_plot_setting_changed)
         d3_layout.addRow("3D Trajectory Kalınlığı:", self.trajectory_3d_width_spin)
         
@@ -299,7 +313,13 @@ class PreferencesDialog(QDialog):
         self.grid_alpha_label.setText(f"{value}%")
     
     def on_plot_setting_changed(self):
-        """Called when any plot setting changes - apply and emit signal"""
+        """Called when any plot setting changes - throttled update"""
+        # Restart timer (debounce rapid changes)
+        self.update_timer.stop()
+        self.update_timer.start()
+    
+    def _apply_and_emit(self):
+        """Actually apply settings and emit signal (throttled)"""
         self.apply_plot_settings()
         self.plot_settings_changed.emit()
     
