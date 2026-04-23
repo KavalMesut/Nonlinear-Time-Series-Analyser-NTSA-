@@ -430,28 +430,36 @@ class MainWindow(QMainWindow):
     
     def show_preferences(self):
         """Show preferences dialog"""
+        # Backup current settings in case user cancels
+        settings_backup = self.plot_settings.settings.copy()
+        
         dialog = PreferencesDialog(
             self,
             self.theme_manager,
             self.translation_manager,
             self.plot_settings
         )
+        
+        # Connect live update signal
+        dialog.plot_settings_changed.connect(self.plot_panel.apply_settings)
+        
         if dialog.exec():
-            # Apply changes
+            # User clicked Save - apply all changes
             theme = dialog.get_selected_theme()
             language = dialog.get_selected_language()
             
-            # Apply plot settings
-            dialog.apply_plot_settings()
-            
-            # Refresh plots with new settings
-            self.plot_panel.apply_settings()
+            # Save plot settings to file
+            self.plot_settings.save()
             
             if theme != self.theme_manager.current_theme:
                 self.apply_theme(theme)
             
             if language != self.translation_manager.current_language:
                 self.set_language(language)
+        else:
+            # User clicked Cancel - restore backup
+            self.plot_settings.settings = settings_backup
+            self.plot_panel.apply_settings()
     
     def show_about(self):
         """Show about dialog"""
