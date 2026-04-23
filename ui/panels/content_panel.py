@@ -115,9 +115,10 @@ class ContentPanel(QWidget):
             'metadata': timeseries.metadata
         })
 
-        # Adimlari ac
+        # Adimlari ac ve ilk adimi tamamlanmis olarak isaretle
         main_window = self.window()
         if hasattr(main_window, 'steps_panel'):
+            main_window.steps_panel.mark_step_completed(0)  # Data load completed
             main_window.steps_panel.unlock_step(1)
             main_window.steps_panel.unlock_step(2)
 
@@ -128,6 +129,7 @@ class ContentPanel(QWidget):
     def on_linear_analysis_complete(self, results):
         main_window = self.window()
         if hasattr(main_window, 'steps_panel'):
+            main_window.steps_panel.mark_step_completed(2)  # Linear analysis completed
             main_window.steps_panel.unlock_step(3)
 
     def on_parameters_estimated(self, params):
@@ -136,6 +138,7 @@ class ContentPanel(QWidget):
             m = params['m']
             main_window = self.window()
             if hasattr(main_window, 'steps_panel'):
+                main_window.steps_panel.mark_step_completed(3)  # Parameter estimation completed
                 main_window.steps_panel.unlock_step(4)
                 main_window.steps_panel.unlock_step(5)
             
@@ -148,12 +151,18 @@ class ContentPanel(QWidget):
     def on_chaos_analysis_complete(self, results):
         main_window = self.window()
         if hasattr(main_window, 'steps_panel'):
+            main_window.steps_panel.mark_step_completed(5)  # Chaos analysis completed
             main_window.steps_panel.unlock_step(6)
 
     def on_data_preprocessed(self, timeseries):
         """On isleme sonrasi guncellenmis veriyi diger panellere ilet"""
         self.current_data = timeseries
         self.data_table.set_data(timeseries)
+        
+        # Mark preprocessing as completed
+        main_window = self.window()
+        if hasattr(main_window, 'steps_panel'):
+            main_window.steps_panel.mark_step_completed(1)  # Preprocessing completed
         self.linear_analysis_panel.set_data(timeseries)
         self.parameter_panel.set_data(timeseries)
         self.chaos_panel.reset_data(timeseries)

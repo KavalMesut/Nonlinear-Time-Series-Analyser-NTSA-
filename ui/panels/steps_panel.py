@@ -42,6 +42,32 @@ class StepsPanel(QWidget):
         self.steps_list = QListWidget()
         self.steps_list.currentRowChanged.connect(self.on_step_selected)
         
+        # Apply custom styling
+        self.steps_list.setStyleSheet("""
+            QListWidget {
+                font-size: 14pt;
+                padding: 5px;
+            }
+            QListWidget::item {
+                padding: 12px;
+                margin: 4px;
+                border-radius: 6px;
+                border: 2px solid transparent;
+            }
+            QListWidget::item:selected {
+                background-color: #1e5a8e;
+                border: 2px solid #2a7ab8;
+                /* Inset shadow effect for pressed look */
+                box-shadow: inset 0px 3px 6px rgba(0, 0, 0, 0.4);
+            }
+            QListWidget::item:hover:!selected {
+                background-color: #2a4a5e;
+            }
+            QListWidget::item:disabled {
+                color: #666666;
+            }
+        """)
+        
         # Add steps
         self.steps = [
             ('step_data_load', True),
@@ -52,6 +78,9 @@ class StepsPanel(QWidget):
             ('step_chaos_analysis', False),
             ('step_results', False)
         ]
+        
+        # Track completed steps
+        self.completed_steps = set()
         
         for step_key, unlocked in self.steps:
             item = QListWidgetItem(self.tm(step_key))
@@ -97,6 +126,15 @@ class StepsPanel(QWidget):
             self.steps[index] = (self.steps[index][0], True)
             item = self.steps_list.item(index)
             item.setFlags(item.flags() | Qt.ItemIsEnabled)
+    
+    def mark_step_completed(self, index):
+        """Mark a step as completed (green color)"""
+        if index >= 0 and index < len(self.steps):
+            self.completed_steps.add(index)
+            item = self.steps_list.item(index)
+            # Set green background for completed step
+            item.setBackground(Qt.darkGreen)
+            item.setForeground(Qt.white)
     
     def lock_step(self, index):
         """Lock a step"""

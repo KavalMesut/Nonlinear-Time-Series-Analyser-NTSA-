@@ -171,6 +171,11 @@ class EmbeddingPanel(QWidget):
         }
         
         self.plot_requested.emit(plot_data)
+        
+        # Mark phase space step as completed
+        main_window = self.window()
+        if hasattr(main_window, 'steps_panel'):
+            main_window.steps_panel.mark_step_completed(4)  # Phase space completed
     
     def _plot_3d_phase_space(self):
         """3D faz uzayı plot (x(t), x(t+τ), x(t+2τ))"""
