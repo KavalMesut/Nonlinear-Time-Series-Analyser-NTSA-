@@ -3,8 +3,8 @@ Data loading panel with drag-drop and file browser support
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QComboBox, QGroupBox, QFileDialog, QSpinBox,
-    QDoubleSpinBox, QFormLayout, QRadioButton, QButtonGroup
+    QLineEdit, QComboBox, QGroupBox, QFileDialog,
+    QFormLayout, QRadioButton, QButtonGroup
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
@@ -115,11 +115,10 @@ class DataLoadPanel(QWidget):
         # File parameters
         file_params_layout = QFormLayout()
         
-        self.dt_file_spin = QDoubleSpinBox()
-        self.dt_file_spin.setRange(0.001, 100.0)
-        self.dt_file_spin.setValue(1.0)
-        self.dt_file_spin.setDecimals(3)
-        file_params_layout.addRow(self.tm('data_dt') + ':', self.dt_file_spin)
+        self.dt_file_input = QLineEdit()
+        self.dt_file_input.setText("1.0")
+        self.dt_file_input.setPlaceholderText("0.001 - 100.0")
+        file_params_layout.addRow(self.tm('data_dt') + ':', self.dt_file_input)
         
         file_layout.addLayout(file_params_layout)
         
@@ -141,18 +140,16 @@ class DataLoadPanel(QWidget):
         generate_layout.addRow(self.tm('data_system_type') + ':', self.system_combo)
         
         # Number of points
-        self.n_points_spin = QSpinBox()
-        self.n_points_spin.setRange(100, 100000)
-        self.n_points_spin.setValue(5000)
-        self.n_points_spin.setSingleStep(100)
-        generate_layout.addRow(self.tm('data_points') + ':', self.n_points_spin)
+        self.n_points_input = QLineEdit()
+        self.n_points_input.setText("5000")
+        self.n_points_input.setPlaceholderText("100 - 100000")
+        generate_layout.addRow(self.tm('data_points') + ':', self.n_points_input)
         
         # Time step
-        self.dt_gen_spin = QDoubleSpinBox()
-        self.dt_gen_spin.setRange(0.001, 10.0)
-        self.dt_gen_spin.setValue(0.01)
-        self.dt_gen_spin.setDecimals(3)
-        generate_layout.addRow(self.tm('data_dt') + ':', self.dt_gen_spin)
+        self.dt_gen_input = QLineEdit()
+        self.dt_gen_input.setText("0.01")
+        self.dt_gen_input.setPlaceholderText("0.001 - 10.0")
+        generate_layout.addRow(self.tm('data_dt') + ':', self.dt_gen_input)
         
         self.generate_group.setLayout(generate_layout)
         layout.addWidget(self.generate_group)
@@ -249,7 +246,15 @@ class DataLoadPanel(QWidget):
                 
                 # Determine file type
                 ext = os.path.splitext(file_path)[1].lower()
-                dt = self.dt_file_spin.value()
+                
+                # Parse dt from input field
+                try:
+                    dt = float(self.dt_file_input.text())
+                    if dt <= 0 or dt > 100:
+                        raise ValueError("dt must be between 0.001 and 100")
+                except ValueError:
+                    print("Invalid time step value. Using default 1.0")
+                    dt = 1.0
                 
                 if ext == '.csv':
                     ts = load_csv(file_path, dt=dt)
@@ -261,8 +266,24 @@ class DataLoadPanel(QWidget):
             else:
                 # Generate system
                 system_type = self.system_combo.currentData()
-                n_points = self.n_points_spin.value()
-                dt = self.dt_gen_spin.value()
+                
+                # Parse n_points from input field
+                try:
+                    n_points = int(self.n_points_input.text())
+                    if n_points < 100 or n_points > 100000:
+                        raise ValueError("n_points must be between 100 and 100000")
+                except ValueError:
+                    print("Invalid number of points. Using default 5000")
+                    n_points = 5000
+                
+                # Parse dt from input field
+                try:
+                    dt = float(self.dt_gen_input.text())
+                    if dt <= 0 or dt > 10:
+                        raise ValueError("dt must be between 0.001 and 10")
+                except ValueError:
+                    print("Invalid time step value. Using default 0.01")
+                    dt = 0.01
                 
                 from core.generators import (
                     generate_lorenz, generate_rossler, logistic_map, henon_map,

@@ -102,15 +102,21 @@ class PreferencesDialog(QDialog):
         line_layout.addRow("Çizgi Rengi:", self.line_color_btn)
         
         # Line width
-        self.line_width_spin = QSpinBox()
-        self.line_width_spin.setRange(1, 5)
-        self.line_width_spin.setValue(self.plot_settings.get('line_width'))
-        self.line_width_spin.setWrapping(False)
-        self.line_width_spin.setButtonSymbols(QSpinBox.UpDownArrows)
-        self.line_width_spin.setMinimumWidth(80)
-        self.line_width_spin.setSuffix(" px")
-        self.line_width_spin.valueChanged.connect(self.on_plot_setting_changed)
-        line_layout.addRow("Çizgi Kalınlığı:", self.line_width_spin)
+        line_width_label_layout = QHBoxLayout()
+        line_width_label_layout.addWidget(QLabel("Çizgi Kalınlığı:"))
+        self.line_width_label = QLabel(f"{self.plot_settings.get('line_width')} px")
+        line_width_label_layout.addStretch()
+        line_width_label_layout.addWidget(self.line_width_label)
+        line_layout.addRow(line_width_label_layout)
+        
+        self.line_width_slider = QSlider(Qt.Horizontal)
+        self.line_width_slider.setRange(1, 5)
+        self.line_width_slider.setValue(self.plot_settings.get('line_width'))
+        self.line_width_slider.setTickPosition(QSlider.TicksBelow)
+        self.line_width_slider.setTickInterval(1)
+        self.line_width_slider.valueChanged.connect(self.update_line_width_label)
+        self.line_width_slider.valueChanged.connect(self.on_plot_setting_changed)
+        line_layout.addRow(self.line_width_slider)
         
         line_group.setLayout(line_layout)
         plot_layout.addWidget(line_group)
@@ -120,13 +126,21 @@ class PreferencesDialog(QDialog):
         scatter_layout = QFormLayout()
         
         # Scatter size
-        self.scatter_size_spin = QSpinBox()
-        self.scatter_size_spin.setRange(2, 10)
-        self.scatter_size_spin.setValue(self.plot_settings.get('scatter_size'))
-        self.scatter_size_spin.setSuffix(" px")
-        self.scatter_size_spin.setMinimumWidth(80)
-        self.scatter_size_spin.valueChanged.connect(self.on_plot_setting_changed)
-        scatter_layout.addRow("Nokta Boyutu:", self.scatter_size_spin)
+        scatter_size_label_layout = QHBoxLayout()
+        scatter_size_label_layout.addWidget(QLabel("Nokta Boyutu:"))
+        self.scatter_size_label = QLabel(f"{self.plot_settings.get('scatter_size')} px")
+        scatter_size_label_layout.addStretch()
+        scatter_size_label_layout.addWidget(self.scatter_size_label)
+        scatter_layout.addRow(scatter_size_label_layout)
+        
+        self.scatter_size_slider = QSlider(Qt.Horizontal)
+        self.scatter_size_slider.setRange(2, 10)
+        self.scatter_size_slider.setValue(self.plot_settings.get('scatter_size'))
+        self.scatter_size_slider.setTickPosition(QSlider.TicksBelow)
+        self.scatter_size_slider.setTickInterval(1)
+        self.scatter_size_slider.valueChanged.connect(self.update_scatter_size_label)
+        self.scatter_size_slider.valueChanged.connect(self.on_plot_setting_changed)
+        scatter_layout.addRow(self.scatter_size_slider)
         
         scatter_group.setLayout(scatter_layout)
         plot_layout.addWidget(scatter_group)
@@ -169,13 +183,21 @@ class PreferencesDialog(QDialog):
         axis_layout.addRow("Eksen Rengi:", self.axis_color_btn)
         
         # Font size
-        self.font_size_spin = QSpinBox()
-        self.font_size_spin.setRange(8, 16)
-        self.font_size_spin.setValue(self.plot_settings.get('font_size'))
-        self.font_size_spin.setSuffix(" pt")
-        self.font_size_spin.setMinimumWidth(80)
-        self.font_size_spin.valueChanged.connect(self.on_plot_setting_changed)
-        axis_layout.addRow("Font Boyutu:", self.font_size_spin)
+        font_size_label_layout = QHBoxLayout()
+        font_size_label_layout.addWidget(QLabel("Font Boyutu:"))
+        self.font_size_label = QLabel(f"{self.plot_settings.get('font_size')} pt")
+        font_size_label_layout.addStretch()
+        font_size_label_layout.addWidget(self.font_size_label)
+        axis_layout.addRow(font_size_label_layout)
+        
+        self.font_size_slider = QSlider(Qt.Horizontal)
+        self.font_size_slider.setRange(8, 16)
+        self.font_size_slider.setValue(self.plot_settings.get('font_size'))
+        self.font_size_slider.setTickPosition(QSlider.TicksBelow)
+        self.font_size_slider.setTickInterval(1)
+        self.font_size_slider.valueChanged.connect(self.update_font_size_label)
+        self.font_size_slider.valueChanged.connect(self.on_plot_setting_changed)
+        axis_layout.addRow(self.font_size_slider)
         
         axis_group.setLayout(axis_layout)
         plot_layout.addWidget(axis_group)
@@ -185,22 +207,38 @@ class PreferencesDialog(QDialog):
         d3_layout = QFormLayout()
         
         # 3D scatter size
-        self.scatter_3d_size_spin = QSpinBox()
-        self.scatter_3d_size_spin.setRange(1, 8)
-        self.scatter_3d_size_spin.setValue(self.plot_settings.get('scatter_3d_size'))
-        self.scatter_3d_size_spin.setSuffix(" px")
-        self.scatter_3d_size_spin.setMinimumWidth(80)
-        self.scatter_3d_size_spin.valueChanged.connect(self.on_plot_setting_changed)
-        d3_layout.addRow("3D Nokta Boyutu:", self.scatter_3d_size_spin)
+        scatter_3d_size_label_layout = QHBoxLayout()
+        scatter_3d_size_label_layout.addWidget(QLabel("3D Nokta Boyutu:"))
+        self.scatter_3d_size_label = QLabel(f"{self.plot_settings.get('scatter_3d_size')} px")
+        scatter_3d_size_label_layout.addStretch()
+        scatter_3d_size_label_layout.addWidget(self.scatter_3d_size_label)
+        d3_layout.addRow(scatter_3d_size_label_layout)
+        
+        self.scatter_3d_size_slider = QSlider(Qt.Horizontal)
+        self.scatter_3d_size_slider.setRange(1, 8)
+        self.scatter_3d_size_slider.setValue(self.plot_settings.get('scatter_3d_size'))
+        self.scatter_3d_size_slider.setTickPosition(QSlider.TicksBelow)
+        self.scatter_3d_size_slider.setTickInterval(1)
+        self.scatter_3d_size_slider.valueChanged.connect(self.update_scatter_3d_size_label)
+        self.scatter_3d_size_slider.valueChanged.connect(self.on_plot_setting_changed)
+        d3_layout.addRow(self.scatter_3d_size_slider)
         
         # 3D trajectory width
-        self.trajectory_3d_width_spin = QSpinBox()
-        self.trajectory_3d_width_spin.setRange(1, 5)
-        self.trajectory_3d_width_spin.setValue(self.plot_settings.get('trajectory_3d_width'))
-        self.trajectory_3d_width_spin.setSuffix(" px")
-        self.trajectory_3d_width_spin.setMinimumWidth(80)
-        self.trajectory_3d_width_spin.valueChanged.connect(self.on_plot_setting_changed)
-        d3_layout.addRow("3D Trajectory Kalınlığı:", self.trajectory_3d_width_spin)
+        trajectory_3d_width_label_layout = QHBoxLayout()
+        trajectory_3d_width_label_layout.addWidget(QLabel("3D Trajectory Kalınlığı:"))
+        self.trajectory_3d_width_label = QLabel(f"{self.plot_settings.get('trajectory_3d_width')} px")
+        trajectory_3d_width_label_layout.addStretch()
+        trajectory_3d_width_label_layout.addWidget(self.trajectory_3d_width_label)
+        d3_layout.addRow(trajectory_3d_width_label_layout)
+        
+        self.trajectory_3d_width_slider = QSlider(Qt.Horizontal)
+        self.trajectory_3d_width_slider.setRange(1, 5)
+        self.trajectory_3d_width_slider.setValue(self.plot_settings.get('trajectory_3d_width'))
+        self.trajectory_3d_width_slider.setTickPosition(QSlider.TicksBelow)
+        self.trajectory_3d_width_slider.setTickInterval(1)
+        self.trajectory_3d_width_slider.valueChanged.connect(self.update_trajectory_3d_width_label)
+        self.trajectory_3d_width_slider.valueChanged.connect(self.on_plot_setting_changed)
+        d3_layout.addRow(self.trajectory_3d_width_slider)
         
         d3_group.setLayout(d3_layout)
         plot_layout.addWidget(d3_group)
@@ -265,14 +303,14 @@ class PreferencesDialog(QDialog):
         # Update UI with defaults
         self.line_color = self.plot_settings.get_color('line_color')
         self.update_color_button(self.line_color_btn, self.line_color)
-        self.line_width_spin.setValue(self.plot_settings.get('line_width'))
-        self.scatter_size_spin.setValue(self.plot_settings.get('scatter_size'))
+        self.line_width_slider.setValue(self.plot_settings.get('line_width'))
+        self.scatter_size_slider.setValue(self.plot_settings.get('scatter_size'))
         self.grid_alpha_slider.setValue(self.plot_settings.get('grid_alpha'))
         self.axis_color = self.plot_settings.get_color('axis_color')
         self.update_color_button(self.axis_color_btn, self.axis_color)
-        self.font_size_spin.setValue(self.plot_settings.get('font_size'))
-        self.scatter_3d_size_spin.setValue(self.plot_settings.get('scatter_3d_size'))
-        self.trajectory_3d_width_spin.setValue(self.plot_settings.get('trajectory_3d_width'))
+        self.font_size_slider.setValue(self.plot_settings.get('font_size'))
+        self.scatter_3d_size_slider.setValue(self.plot_settings.get('scatter_3d_size'))
+        self.trajectory_3d_width_slider.setValue(self.plot_settings.get('trajectory_3d_width'))
         self.antialiasing_check.setChecked(self.plot_settings.get('antialiasing'))
     
     def update_color_button(self, button: QPushButton, color: QColor):
@@ -316,6 +354,26 @@ class PreferencesDialog(QDialog):
         """Update grid alpha label"""
         self.grid_alpha_label.setText(f"{value}%")
     
+    def update_line_width_label(self, value: int):
+        """Update line width label"""
+        self.line_width_label.setText(f"{value} px")
+    
+    def update_scatter_size_label(self, value: int):
+        """Update scatter size label"""
+        self.scatter_size_label.setText(f"{value} px")
+    
+    def update_font_size_label(self, value: int):
+        """Update font size label"""
+        self.font_size_label.setText(f"{value} pt")
+    
+    def update_scatter_3d_size_label(self, value: int):
+        """Update 3D scatter size label"""
+        self.scatter_3d_size_label.setText(f"{value} px")
+    
+    def update_trajectory_3d_width_label(self, value: int):
+        """Update 3D trajectory width label"""
+        self.trajectory_3d_width_label.setText(f"{value} px")
+    
     def on_plot_setting_changed(self):
         """Called when any plot setting changes - throttled update"""
         # Restart timer (debounce rapid changes)
@@ -330,12 +388,12 @@ class PreferencesDialog(QDialog):
     def apply_plot_settings(self):
         """Apply plot settings to PlotSettings object"""
         self.plot_settings.set_color('line_color', self.line_color)
-        self.plot_settings.set('line_width', self.line_width_spin.value())
-        self.plot_settings.set('scatter_size', self.scatter_size_spin.value())
+        self.plot_settings.set('line_width', self.line_width_slider.value())
+        self.plot_settings.set('scatter_size', self.scatter_size_slider.value())
         self.plot_settings.set('grid_alpha', self.grid_alpha_slider.value())
         self.plot_settings.set_color('axis_color', self.axis_color)
-        self.plot_settings.set('font_size', self.font_size_spin.value())
-        self.plot_settings.set('scatter_3d_size', self.scatter_3d_size_spin.value())
-        self.plot_settings.set('trajectory_3d_width', self.trajectory_3d_width_spin.value())
+        self.plot_settings.set('font_size', self.font_size_slider.value())
+        self.plot_settings.set('scatter_3d_size', self.scatter_3d_size_slider.value())
+        self.plot_settings.set('trajectory_3d_width', self.trajectory_3d_width_slider.value())
         self.plot_settings.set('antialiasing', self.antialiasing_check.isChecked())
         # Don't save yet - save only on dialog accept

@@ -108,7 +108,7 @@ class DarkTheme(Theme):
                 color: {self.colors['foreground_secondary']};
             }}
             
-            QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
+            QLineEdit, QTextEdit, QPlainTextEdit, QComboBox {{
                 background-color: {self.colors['background_tertiary']};
                 color: {self.colors['foreground']};
                 border: 1px solid {self.colors['border']};
@@ -117,31 +117,11 @@ class DarkTheme(Theme):
             }}
             
             QSpinBox, QDoubleSpinBox {{
-                padding-right: 15px;
-            }}
-            
-            QSpinBox::up-button, QDoubleSpinBox::up-button {{
-                subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 15px;
-                border-left: 1px solid {self.colors['border']};
-                background-color: {self.colors['background_secondary']};
-            }}
-            
-            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
-                background-color: {self.colors['accent']};
-            }}
-            
-            QSpinBox::down-button, QDoubleSpinBox::down-button {{
-                subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 15px;
-                border-left: 1px solid {self.colors['border']};
-                background-color: {self.colors['background_secondary']};
-            }}
-            
-            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-                background-color: {self.colors['accent']};
+                background-color: {self.colors['background_tertiary']};
+                color: {self.colors['foreground']};
+                border: 1px solid {self.colors['border']};
+                padding: 4px;
+                border-radius: 2px;
             }}
             
             QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
