@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .themes import ThemeManager
 from .translations import TranslationManager
+from .plot_settings import PlotSettings
 from .panels.steps_panel import StepsPanel
 from .panels.content_panel import ContentPanel
 from .panels.plot_panel import PlotPanel
@@ -32,6 +33,7 @@ class MainWindow(QMainWindow):
         # Managers
         self.theme_manager = ThemeManager()
         self.translation_manager = TranslationManager(default_language='tr')
+        self.plot_settings = PlotSettings()
         
         # Session
         self.current_session = AnalysisSession()
@@ -71,7 +73,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.content_panel)
         
         # Sag panel — Grafik
-        self.plot_panel = PlotPanel(self.theme_manager)
+        self.plot_panel = PlotPanel(self.theme_manager, self.plot_settings)
         splitter.addWidget(self.plot_panel)
         
         # ContentPanel'den gelen grafik isteklerini PlotPanel'e bagla
@@ -431,12 +433,19 @@ class MainWindow(QMainWindow):
         dialog = PreferencesDialog(
             self,
             self.theme_manager,
-            self.translation_manager
+            self.translation_manager,
+            self.plot_settings
         )
         if dialog.exec():
             # Apply changes
             theme = dialog.get_selected_theme()
             language = dialog.get_selected_language()
+            
+            # Apply plot settings
+            dialog.apply_plot_settings()
+            
+            # Refresh plots with new settings
+            self.plot_panel.apply_settings()
             
             if theme != self.theme_manager.current_theme:
                 self.apply_theme(theme)

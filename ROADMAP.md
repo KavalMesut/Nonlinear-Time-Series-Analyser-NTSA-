@@ -511,6 +511,12 @@ Sıra değiştirme.
   - PDF export
 
 ### Orta Öncelik
+- [ ] Gelişmiş Wolf Algoritması Parametreleri
+  - Manuel override için opsiyonel parametre paneli ekle
+  - Parametreler: initial_neighbor_distance, min_neighbor_distance, replacement_threshold, max_iterations, min_tsep, evolve_steps, replacement_angle_deg
+  - Şu anda otomatik kalibre ediliyor, ileri düzey kullanıcılar için açılabilir
+  - Referans: `analysis/lyapunov.py:272-280`
+
 - [ ] Embedding Visualization (Step 5)
   - 2D/3D phase space plot
   - Poincaré kesitleri

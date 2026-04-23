@@ -95,9 +95,10 @@ class CustomGLViewWidget(gl.GLViewWidget):
 class PlotPanel(QWidget):
     """Sag panel: ust/alt split grafik + gecmis sistemi"""
 
-    def __init__(self, theme_manager):
+    def __init__(self, theme_manager, plot_settings):
         super().__init__()
         self.theme_manager = theme_manager
+        self.plot_settings = plot_settings
         
         # Plot history (son 20 grafik sakla)
         self.plot_history: List[Dict] = []
@@ -125,7 +126,8 @@ class PlotPanel(QWidget):
         self.top_stack = QStackedWidget()
         
         self.top_plot_widget = pg.PlotWidget()
-        self.top_plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        grid_alpha = self.plot_settings.get_grid_alpha_normalized()
+        self.top_plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
         self.top_plot_widget.addLegend()
         self._apply_theme(self.top_plot_widget)
         self.top_stack.addWidget(self.top_plot_widget)  # index 0
@@ -178,7 +180,8 @@ class PlotPanel(QWidget):
         self.bottom_stack = QStackedWidget()
         
         self.bottom_plot_widget = pg.PlotWidget()
-        self.bottom_plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        grid_alpha = self.plot_settings.get_grid_alpha_normalized()
+        self.bottom_plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
         self.bottom_plot_widget.addLegend()
         self._apply_theme(self.bottom_plot_widget)
         self.bottom_stack.addWidget(self.bottom_plot_widget)  # index 0
@@ -218,6 +221,69 @@ class PlotPanel(QWidget):
         """)
 
         layout.addWidget(self.vsplitter)
+    
+    def _get_pen(self, color=None, width=None):
+        """Get pen with current settings"""
+        if color is None:
+            color = self.plot_settings.get('line_color')
+        if width is None:
+            width = self.plot_settings.get('line_width')
+        return pg.mkPen(color=color, width=width)
+    
+    def apply_settings(self):
+        """Apply current plot settings to all plots"""
+        # Update grid alpha
+        grid_alpha = self.plot_settings.get_grid_alpha_normalized()
+        self.top_plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        self.bottom_plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
+        
+        # Redraw current plots with new settings
+        if self.plot_history:
+            # Redraw top plot
+            last_plot = self.plot_history[-1]
+            self._redraw_plot(last_plot, 'top')
+            
+            # Redraw bottom plot if selected
+            if self.bottom_combo.currentIndex() > 0:
+                idx = self.bottom_combo.currentIndex() - 1
+                if idx < len(self.plot_history):
+                    self._redraw_plot(self.plot_history[idx], 'bottom')
+    
+    def _redraw_plot(self, plot_data: dict, target: str):
+        """Redraw a plot with current settings"""
+        ptype = plot_data.get('type', '')
+        
+        if target == 'top':
+            widget = self.top_plot_widget
+            title_label = self.top_title_label
+            widget_3d = self.top_3d_widget
+            stack = self.top_stack
+        else:
+            widget = self.bottom_plot_widget
+            title_label = self.bottom_title_label
+            widget_3d = self.bottom_3d_widget
+            stack = self.bottom_stack
+        
+        # 3D grafik mi?
+        if ptype == 'embedding_3d':
+            stack.setCurrentIndex(1)
+            self._plot_embedding_3d(plot_data, widget_3d, title_label)
+        else:
+            stack.setCurrentIndex(0)
+            if ptype == 'timeseries':
+                self._plot_timeseries(plot_data, widget, title_label)
+            elif ptype == 'linear':
+                self._plot_linear(plot_data, widget, title_label)
+            elif ptype == 'param_tau':
+                self._plot_param_tau(plot_data, widget, title_label)
+            elif ptype == 'param_m':
+                self._plot_param_m(plot_data, widget, title_label)
+            elif ptype == 'chaos_lyapunov':
+                self._plot_chaos_lyapunov(plot_data, widget, title_label)
+            elif ptype == 'chaos_spectrum':
+                self._plot_chaos_spectrum(plot_data, widget, title_label)
+            elif ptype == 'chaos_correlation':
+                self._plot_chaos_correlation(plot_data, widget, title_label)
 
     def clear_plot(self):
         """Tüm grafikleri temizle"""
@@ -434,7 +500,7 @@ class PlotPanel(QWidget):
         widget.setLabel('bottom', 'Time')
         title_label.setText("Time Series")
         widget.plot(d['time'], d['data'],
-                    pen=pg.mkPen(color='#0e639c', width=1.5),
+                    pen=self._get_pen(),
                     name='Time Series')
 
     def _plot_linear(self, d, widget, title_label):
@@ -449,7 +515,7 @@ class PlotPanel(QWidget):
             widget.setLabel('left', 'ACF')
             widget.setLabel('bottom', 'Lag')
             widget.plot(results['lags'], results['acf'],
-                        pen=pg.mkPen(color='#0e639c', width=2))
+                        pen=self._get_pen())
             conf = 1.96 / np.sqrt(n)
             widget.plot(results['lags'], [conf] * len(results['lags']),
                         pen=pg.mkPen(color='red', style=Qt.DashLine))
@@ -460,13 +526,13 @@ class PlotPanel(QWidget):
             widget.setLabel('left', 'PACF')
             widget.setLabel('bottom', 'Lag')
             widget.plot(results['lags'], results['pacf'],
-                        pen=pg.mkPen(color='#859900', width=2))
+                        pen=self._get_pen())
         elif atype == 'fft':
             title_label.setText("FFT Power Spectrum")
             widget.setLabel('left', 'Power')
             widget.setLabel('bottom', 'Frequency (Hz)')
             widget.plot(results['frequencies'], results['power'],
-                        pen=pg.mkPen(color='#d33682', width=1.5))
+                        pen=self._get_pen())
             widget.setLogMode(y=True)
 
     def _plot_param_tau(self, d, widget, title_label):
@@ -477,12 +543,13 @@ class PlotPanel(QWidget):
         widget.setLabel('bottom', 'Lag')
         results = d['results']
         widget.plot(results['lags'], results['ami'],
-                    pen=pg.mkPen(color='#268bd2', width=2))
+                    pen=self._get_pen())
         tau = results['tau']
         ami = results['ami']
         if 0 < tau <= len(ami):
+            scatter_size = self.plot_settings.get('scatter_size')
             widget.plot([tau], [ami[tau - 1]],
-                        pen=None, symbol='o', symbolSize=10,
+                        pen=None, symbol='o', symbolSize=scatter_size * 2,
                         symbolBrush='red')
 
     def _plot_param_m(self, d, widget, title_label):
@@ -493,7 +560,7 @@ class PlotPanel(QWidget):
         widget.setLabel('bottom', 'Dimension')
         results = d['results']
         widget.plot(results['dimensions'], results['fnn'],
-                    pen=pg.mkPen(color='#859900', width=2))
+                    pen=self._get_pen())
         widget.plot(results['dimensions'],
                     [1.0] * len(results['dimensions']),
                     pen=pg.mkPen(color='red', style=Qt.DashLine))
@@ -512,14 +579,15 @@ class PlotPanel(QWidget):
             div = results['divergence']
             valid = ~np.isnan(div)
             widget.plot(t[valid], div[valid],
-                        pen=pg.mkPen(color='#0e639c', width=2))
+                        pen=self._get_pen())
         else:
             widget.setLabel('left', 'λ')
             widget.setLabel('bottom', '')
             lyap = results.get('lyapunov', 0)
+            scatter_size = self.plot_settings.get('scatter_size')
             widget.plot([0], [lyap],
-                        pen=None, symbol='o', symbolSize=15,
-                        symbolBrush='#0e639c')
+                        pen=None, symbol='o', symbolSize=scatter_size * 3,
+                        symbolBrush=self.plot_settings.get('line_color'))
 
     def _plot_chaos_spectrum(self, d, widget, title_label):
         widget.clear()
@@ -555,9 +623,10 @@ class PlotPanel(QWidget):
         if np.any(valid):
             log_r = np.log(radii[valid])
             log_c = np.log(c_r[valid])
+            scatter_size = self.plot_settings.get('scatter_size')
             widget.plot(log_r, log_c,
-                        pen=pg.mkPen(color='#859900', width=2),
-                        symbol='o', symbolSize=5)
+                        pen=self._get_pen(),
+                        symbol='o', symbolSize=scatter_size)
 
     def _plot_preprocessing(self, d, widget, title_label):
         widget.clear()
@@ -573,7 +642,7 @@ class PlotPanel(QWidget):
                         name='Original')
         # Islenmis veri
         widget.plot(d['time_processed'], d['data_processed'],
-                    pen=pg.mkPen(color='#0e639c', width=1.5),
+                    pen=self._get_pen(),
                     name='Processed')
 
     def _plot_embedding_2d(self, d, widget, title_label):
@@ -589,7 +658,7 @@ class PlotPanel(QWidget):
         y = d['y']
         
         # Scatter plot (trajectory)
-        widget.plot(x, y, pen=pg.mkPen(color='#0e639c', width=1.5))
+        widget.plot(x, y, pen=self._get_pen())
         
         # İlk nokta (başlangıç) kırmızı
         widget.plot([x[0]], [y[0]], 
@@ -648,21 +717,24 @@ class PlotPanel(QWidget):
         colors[:, 2] = np.linspace(1, 0, n)  # Mavi azalıyor
         colors[:, 3] = 0.6  # Alpha (yarı saydam)
         
-        # Scatter plot (3D noktalar)
+        # Scatter plot (3D noktalar) - settings'den boyut al
+        scatter_3d_size = self.plot_settings.get('scatter_3d_size')
         scatter = gl.GLScatterPlotItem(
             pos=pos,
             color=colors,
-            size=3,
+            size=scatter_3d_size,
             pxMode=True  # Piksel cinsinden boyut
         )
         widget.addItem(scatter)
         
-        # Trajectory line (çizgi)
+        # Trajectory line (çizgi) - settings'den kalınlık al
+        trajectory_width = self.plot_settings.get('trajectory_3d_width')
+        antialiasing = self.plot_settings.get('antialiasing')
         line = gl.GLLinePlotItem(
             pos=pos,
             color=(0.5, 0.5, 0.5, 0.3),  # Gri, çok saydam
-            width=1,
-            antialias=True
+            width=trajectory_width,
+            antialias=antialiasing
         )
         widget.addItem(line)
         
