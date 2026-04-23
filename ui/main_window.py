@@ -50,6 +50,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(self.tr('window_title'))
         self.setGeometry(100, 100, 1400, 900)
         
+        # Maximize window on startup
+        self.showMaximized()
+        
         # Create menu bar
         self.create_menu_bar()
         

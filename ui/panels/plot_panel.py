@@ -237,17 +237,54 @@ class PlotPanel(QWidget):
         self.top_plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
         self.bottom_plot_widget.showGrid(x=True, y=True, alpha=grid_alpha)
         
-        # Redraw current plots with new settings
-        if self.plot_history:
-            # Redraw top plot
-            last_plot = self.plot_history[-1]
-            self._redraw_plot(last_plot, 'top')
+        # Update font size and axis colors for both widgets
+        self._apply_widget_settings(self.top_plot_widget)
+        self._apply_widget_settings(self.bottom_plot_widget)
+        
+        # Update line width and scatter size for existing plot items
+        self._update_plot_items(self.top_plot_widget)
+        self._update_plot_items(self.bottom_plot_widget)
+    
+    def _update_plot_items(self, widget):
+        """Update pen and symbol size for existing plot items"""
+        new_pen = self._get_pen()
+        scatter_size = self.plot_settings.get('scatter_size')
+        
+        # Update all PlotDataItem objects in the widget
+        items = widget.items()
+        
+        for item in items:
+            # Only process PlotDataItem (has opts attribute)
+            if not hasattr(item, 'opts'):
+                continue
             
-            # Redraw bottom plot if selected
-            if self.bottom_combo.currentIndex() > 0:
-                idx = self.bottom_combo.currentIndex() - 1
-                if idx < len(self.plot_history):
-                    self._redraw_plot(self.plot_history[idx], 'bottom')
+            if hasattr(item, 'setPen'):
+                # Check if it's a line plot (has pen)
+                current_pen = item.opts.get('pen')
+                if current_pen is not None and current_pen is not False:
+                    item.setPen(new_pen)
+            
+            if hasattr(item, 'setSymbolSize'):
+                # Check if it's a scatter plot (has symbols)
+                if item.opts.get('symbol') is not None:
+                    item.setSymbolSize(scatter_size)
+    
+    def _apply_widget_settings(self, widget):
+        """Apply font and axis color settings to a plot widget"""
+        font_size = self.plot_settings.get('font_size')
+        axis_color = self.plot_settings.get('axis_color')
+        
+        # Update axis label styles
+        for axis_name in ['left', 'bottom', 'right', 'top']:
+            axis = widget.getAxis(axis_name)
+            if axis:
+                axis.setStyle(tickTextOffset=10)
+                axis.setPen(axis_color)
+                axis.setTextPen(axis_color)
+                # Update font
+                font = axis.font()
+                font.setPointSize(font_size)
+                axis.setTickFont(font)
     
     def _redraw_plot(self, plot_data: dict, target: str):
         """Redraw a plot with current settings"""
