@@ -111,12 +111,14 @@ class ChaosAnalysisPanel(QWidget):
         self.manual_tau_spin.setRange(1, 100)
         self.manual_tau_spin.setValue(10)
         self.manual_tau_spin.setEnabled(False)
+        self.manual_tau_spin.setButtonSymbols(QSpinBox.UpDownArrows)
         params_layout.addRow("Manuel τ:", self.manual_tau_spin)
         
         self.manual_m_spin = QSpinBox()
         self.manual_m_spin.setRange(2, 20)
         self.manual_m_spin.setValue(3)
         self.manual_m_spin.setEnabled(False)
+        self.manual_m_spin.setButtonSymbols(QSpinBox.UpDownArrows)
         params_layout.addRow("Manuel m:", self.manual_m_spin)
         
         self.use_manual_check = QPushButton("Manuel Parametreleri Kullan")

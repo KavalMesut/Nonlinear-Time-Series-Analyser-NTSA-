@@ -74,6 +74,7 @@ class LinearAnalysisPanel(QWidget):
         self.max_lag_spin = QSpinBox()
         self.max_lag_spin.setRange(10, 1000)
         self.max_lag_spin.setValue(100)
+        self.max_lag_spin.setButtonSymbols(QSpinBox.UpDownArrows)
         controls_layout.addRow(QLabel("Max Lag:"), self.max_lag_spin)
         
         self.window_combo = QComboBox()

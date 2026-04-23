@@ -121,6 +121,7 @@ class DarkTheme(Theme):
                 color: {self.colors['foreground']};
                 border: 1px solid {self.colors['border']};
                 padding: 4px;
+                padding-right: 25px;
                 border-radius: 2px;
             }}
             
