@@ -82,10 +82,13 @@ class ContentPanel(QWidget):
 
         # --- Alt: Data Table (tum adimlar icin ortak) ---
         self.data_table = DataTablePanel(self.tm)
+        self.data_table.setMinimumHeight(200)  # Minimum görünür boyut
         self.vsplitter.addWidget(self.data_table)
         
-        # Splitter oranlari: %60 kontroller, %40 tablo
-        self.vsplitter.setSizes([600, 400])
+        # Splitter oranlarini sonra set et (window resize sonrasi)
+        # %60 kontroller, %40 tablo olacak sekilde
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(100, lambda: self.vsplitter.setSizes([6000, 4000]))
 
         # Splitter handle stilini ayarla (gorunur yap)
         self.vsplitter.setHandleWidth(6)

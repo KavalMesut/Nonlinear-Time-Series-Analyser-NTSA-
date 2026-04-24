@@ -48,10 +48,6 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """Initialize user interface"""
         self.setWindowTitle(self.tr('window_title'))
-        self.setGeometry(100, 100, 1400, 900)
-        
-        # Maximize window on startup
-        self.showMaximized()
         
         # Create menu bar
         self.create_menu_bar()
@@ -104,6 +100,9 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage(self.tr('msg_info') + ': ' + 
                                    self.tr('window_title'))
+        
+        # Maximize window after all UI is set up
+        self.showMaximized()
     
     def create_menu_bar(self):
         """Create menu bar"""
