@@ -15,6 +15,7 @@ from .linear_analysis_panel import LinearAnalysisPanel
 from .parameter_estimation_panel import ParameterEstimationPanel
 from .embedding_panel import EmbeddingPanel
 from .chaos_analysis_panel import ChaosAnalysisPanel
+from .results_summary_panel import ResultsSummaryPanel
 
 
 class ContentPanel(QWidget):
@@ -77,10 +78,9 @@ class ContentPanel(QWidget):
         self.chaos_panel.plot_requested.connect(self._forward_plot)
         self.stacked_widget.addWidget(self.chaos_panel)
 
-        # 6 — Results (placeholder)
-        placeholder7 = QLabel("Step 7: Results Summary\n\nComing soon...")
-        placeholder7.setAlignment(Qt.AlignCenter)
-        self.stacked_widget.addWidget(placeholder7)
+        # 6 — Results Summary
+        self.results_panel = ResultsSummaryPanel(self.tm)
+        self.stacked_widget.addWidget(self.results_panel)
 
         # Stacked widget'in boyutunu sinirla - tum butonlarin gorunmesi icin yeterli
         from PySide6.QtWidgets import QSizePolicy
@@ -313,6 +313,14 @@ class ContentPanel(QWidget):
 
         # Tabloyu guncelle
         self.data_table_1.set_data(timeseries)
+        
+        # Results panel'i guncelle
+        self.results_panel.update_data_info(
+            filename=getattr(timeseries, 'filename', 'Generated Data'),
+            dt=timeseries.dt,
+            n_points=len(timeseries.data),
+            duration=len(timeseries.data) * timeseries.dt
+        )
 
         # Grafik panele zaman serisi gonder
         plot_data = {
@@ -338,6 +346,13 @@ class ContentPanel(QWidget):
         self.preprocessing_panel.set_data(timeseries)
 
     def on_linear_analysis_complete(self, results):
+        # Results panel'i guncelle
+        self.results_panel.update_linear_analysis(
+            acf_decay=results.get('acf_decay'),
+            pacf_lags=results.get('pacf_lags'),
+            fft_peak=results.get('fft_peak')
+        )
+        
         main_window = self.window()
         if hasattr(main_window, 'steps_panel'):
             main_window.steps_panel.mark_step_completed(2)  # Linear analysis completed
@@ -347,6 +362,10 @@ class ContentPanel(QWidget):
         if 'tau' in params and 'm' in params:
             tau = params['tau']
             m = params['m']
+            
+            # Results panel'i guncelle
+            self.results_panel.update_parameters(tau=tau, m=m)
+            
             main_window = self.window()
             if hasattr(main_window, 'steps_panel'):
                 main_window.steps_panel.mark_step_completed(3)  # Parameter estimation completed
@@ -360,6 +379,14 @@ class ContentPanel(QWidget):
             self.chaos_panel.set_data(self.current_data, tau, m)
 
     def on_chaos_analysis_complete(self, results):
+        # Results panel'i guncelle
+        self.results_panel.update_chaos_analysis(
+            lyapunov=results.get('lyapunov'),
+            spectrum=results.get('spectrum'),
+            corr_dim=results.get('corr_dim'),
+            ky_dim=results.get('ky_dim')
+        )
+        
         main_window = self.window()
         if hasattr(main_window, 'steps_panel'):
             main_window.steps_panel.mark_step_completed(5)  # Chaos analysis completed
@@ -369,6 +396,14 @@ class ContentPanel(QWidget):
         """On isleme sonrasi guncellenmis veriyi diger panellere ilet"""
         self.current_data = timeseries
         self.data_table_1.set_data(timeseries)
+        
+        # Results panel'i guncelle - preprocessing bilgisi
+        # (Bu bilgiyi PreprocessingPanel'den almaliyiz, simdilik placeholder)
+        self.results_panel.update_preprocessing(
+            detrend=True,  # TODO: PreprocessingPanel'den al
+            normalize=True,
+            smoothing="None"
+        )
         
         # Preprocessing sonrasi analiz sonuclarini sifirla (cunku veri degisti)
         # Step 2-6 icin kaydedilmis plot'lari temizle
