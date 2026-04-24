@@ -84,10 +84,23 @@ class ContentPanel(QWidget):
 
         self.vsplitter.addWidget(self.stacked_widget)
 
-        # --- Alt: Data Table (tum adimlar icin ortak) ---
-        self.data_table = DataTablePanel(self.tm)
-        self.data_table.setMinimumHeight(200)  # Minimum görünür boyut
-        self.vsplitter.addWidget(self.data_table)
+        # --- Alt: Data Tables (tum adimlar icin ortak) ---
+        # İkinci bir horizontal splitter - iki tablo yan yana
+        self.table_splitter = QSplitter(Qt.Horizontal)
+        
+        self.data_table_1 = DataTablePanel(self.tm)
+        self.data_table_1.setMinimumHeight(200)
+        self.table_splitter.addWidget(self.data_table_1)
+        
+        self.data_table_2 = DataTablePanel(self.tm)
+        self.data_table_2.setMinimumHeight(200)
+        self.data_table_2.setVisible(False)  # Başlangıçta gizli
+        self.table_splitter.addWidget(self.data_table_2)
+        
+        # İki tablo eşit boyut
+        self.table_splitter.setSizes([5000, 5000])
+        
+        self.vsplitter.addWidget(self.table_splitter)
         
         # Splitter oranlarini sonra set et (window resize sonrasi)
         # %60 kontroller, %40 tablo olacak sekilde
@@ -116,8 +129,35 @@ class ContentPanel(QWidget):
         
         # Hangi adimdan geldigini tespit et ve sakla
         current_step = self.stacked_widget.currentIndex()
-        self.last_plot_data[current_step] = plot_data
-        print(f"[TABLE] Saved plot_data for step {current_step}")
+        
+        # Step 3 (Parameter Estimation) icin ozel - iki plot sakla
+        if current_step == 3:
+            ptype = plot_data.get('type', '')
+            if ptype == 'param_tau':
+                # Tau plot'u - ilk tabloda goster ve sakla
+                if not hasattr(self, 'param_tau_plot'):
+                    self.param_tau_plot = {}
+                self.param_tau_plot = plot_data
+                print(f"[TABLE] Saved tau plot for step {current_step}")
+            elif ptype == 'param_m':
+                # M plot'u - ikinci tabloda goster ve sakla
+                if not hasattr(self, 'param_m_plot'):
+                    self.param_m_plot = {}
+                self.param_m_plot = plot_data
+                print(f"[TABLE] Saved m plot for step {current_step}")
+                # İki plot da varsa cache'e kaydet
+                if hasattr(self, 'param_tau_plot') and self.param_tau_plot:
+                    self.last_plot_data[current_step] = {
+                        'dual': True,
+                        'plot1': self.param_tau_plot,
+                        'plot2': self.param_m_plot
+                    }
+                else:
+                    self.last_plot_data[current_step] = plot_data
+        else:
+            # Diger adimlar icin normal kaydet
+            self.last_plot_data[current_step] = plot_data
+            print(f"[TABLE] Saved plot_data for step {current_step}")
     
     def _update_table_from_plot(self, plot_data: dict):
         """Extract data from plot_data and display in table"""
@@ -243,8 +283,23 @@ class ContentPanel(QWidget):
             ts = TimeSeries(data=y_data, dt=dt, metadata=metadata)
             # Override time with x_data
             ts.time = x_data
-            self.data_table.set_data(ts)
-            print("[TABLE] Table updated!")
+            
+            # Hangi tabloya yazilacagini belirle
+            if ptype == 'param_tau':
+                # Tau → Table 1
+                self.data_table_2.setVisible(True)  # İkinci tabloyu goster
+                self.data_table_1.set_data(ts)
+                print("[TABLE] Table 1 (tau) updated!")
+            elif ptype == 'param_m':
+                # M → Table 2
+                self.data_table_2.setVisible(True)  # İkinci tabloyu goster
+                self.data_table_2.set_data(ts)
+                print("[TABLE] Table 2 (m) updated!")
+            else:
+                # Diger tipler → Table 1, Table 2'yi gizle
+                self.data_table_2.setVisible(False)
+                self.data_table_1.set_data(ts)
+                print("[TABLE] Table 1 updated!")
         else:
             print(f"[TABLE] SKIP: x={x_data is not None}, y={y_data is not None}, len={len(x_data) if x_data is not None else 0}")
 
@@ -252,7 +307,7 @@ class ContentPanel(QWidget):
         self.current_data = timeseries
 
         # Tabloyu guncelle
-        self.data_table.set_data(timeseries)
+        self.data_table_1.set_data(timeseries)
 
         # Grafik panele zaman serisi gonder
         plot_data = {
@@ -308,13 +363,19 @@ class ContentPanel(QWidget):
     def on_data_preprocessed(self, timeseries):
         """On isleme sonrasi guncellenmis veriyi diger panellere ilet"""
         self.current_data = timeseries
-        self.data_table.set_data(timeseries)
+        self.data_table_1.set_data(timeseries)
         
         # Preprocessing sonrasi analiz sonuclarini sifirla (cunku veri degisti)
         # Step 2-6 icin kaydedilmis plot'lari temizle
         for step in [2, 3, 4, 5, 6]:
             if step in self.last_plot_data:
                 del self.last_plot_data[step]
+        
+        # Parameter estimation cache'lerini de temizle
+        if hasattr(self, 'param_tau_plot'):
+            self.param_tau_plot = None
+        if hasattr(self, 'param_m_plot'):
+            self.param_m_plot = None
         
         # Mark preprocessing as completed
         main_window = self.window()
@@ -333,7 +394,8 @@ class ContentPanel(QWidget):
     def reset_all(self):
         """Tüm panelleri sıfırla (yeni analiz için)"""
         self.current_data = None
-        self.data_table.clear_table()
+        self.data_table_1.clear_table()
+        self.data_table_2.clear_table()
         self.last_plot_data.clear()  # Tum kaydedilmis plot'lari sil
         self.stacked_widget.setCurrentIndex(0)  # Data Load paneline dön
         
@@ -355,12 +417,24 @@ class ContentPanel(QWidget):
         
         # Eger bu adim icin daha once plot cizilmisse onu goster
         if step_index in self.last_plot_data:
+            cached_data = self.last_plot_data[step_index]
             print(f"[TABLE] Restoring cached plot for step {step_index}")
-            self._update_table_from_plot(self.last_plot_data[step_index])
+            
+            # Step 3 dual-table mode mu kontrol et
+            if isinstance(cached_data, dict) and cached_data.get('dual'):
+                print("[TABLE] Dual-table mode - restoring both tables")
+                self.data_table_2.setVisible(True)
+                self._update_table_from_plot(cached_data['plot1'])  # Tau
+                self._update_table_from_plot(cached_data['plot2'])  # M
+            else:
+                # Tek tablo mode
+                self.data_table_2.setVisible(False)
+                self._update_table_from_plot(cached_data)
         # Yoksa ham veriyi goster
         elif self.current_data is not None:
             print(f"[TABLE] No cache for step {step_index}, showing raw data")
-            self.data_table.set_data(self.current_data)
+            self.data_table_2.setVisible(False)
+            self.data_table_1.set_data(self.current_data)
 
     def update_plot_theme(self):
         pass
@@ -371,4 +445,5 @@ class ContentPanel(QWidget):
         self.linear_analysis_panel.refresh_ui()
         self.parameter_panel.refresh_ui()
         self.chaos_panel.refresh_ui()
-        self.data_table.refresh_ui()
+        self.data_table_1.refresh_ui()
+        self.data_table_2.refresh_ui()
