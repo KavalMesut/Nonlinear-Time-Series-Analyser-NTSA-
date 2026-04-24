@@ -161,6 +161,9 @@ class DataLoadPanel(QWidget):
         self.load_button.setMinimumHeight(40)
         layout.addWidget(self.load_button)
         
+        # Add stretch to push everything to top
+        layout.addStretch()
+        
         # Initial state
         self.on_source_changed()
     
