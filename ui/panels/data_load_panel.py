@@ -249,7 +249,6 @@ class DataLoadPanel(QWidget):
                     if dt <= 0 or dt > 100:
                         raise ValueError("dt must be between 0.001 and 100")
                 except ValueError:
-                    print("Invalid time step value. Using default 1.0")
                     dt = 1.0
                 
                 if ext == '.csv':
@@ -269,7 +268,6 @@ class DataLoadPanel(QWidget):
                     if n_points < 100 or n_points > 100000:
                         raise ValueError("n_points must be between 100 and 100000")
                 except ValueError:
-                    print("Invalid number of points. Using default 5000")
                     n_points = 5000
                 
                 # Parse dt from input field
@@ -278,7 +276,6 @@ class DataLoadPanel(QWidget):
                     if dt <= 0 or dt > 10:
                         raise ValueError("dt must be between 0.001 and 10")
                 except ValueError:
-                    print("Invalid time step value. Using default 0.01")
                     dt = 0.01
                 
                 from core.generators import (
@@ -302,7 +299,7 @@ class DataLoadPanel(QWidget):
                 self.data_loaded.emit(ts)
         
         except Exception as e:
-            print(f"Error loading data: {e}")
+            pass  # Silent fail
     
     def refresh_ui(self):
         """Refresh UI with current language"""

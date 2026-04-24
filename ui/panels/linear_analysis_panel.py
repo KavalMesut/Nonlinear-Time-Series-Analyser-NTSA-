@@ -152,7 +152,6 @@ class LinearAnalysisPanel(QWidget):
     def on_analysis_error(self, error_msg):
         self.progress.setVisible(False)
         self.calc_button.setEnabled(True)
-        print(f"Analysis error: {error_msg}")
     
     def refresh_ui(self):
         self.calc_button.setText(self.tm('btn_calculate'))

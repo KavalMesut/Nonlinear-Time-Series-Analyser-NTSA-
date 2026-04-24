@@ -128,7 +128,6 @@ class ContentPanel(QWidget):
 
     def _forward_plot(self, plot_data: dict):
         """Forward plot request and update data table"""
-        print(f"[TABLE] _forward_plot: type={plot_data.get('type')}")
         self.plot_requested.emit(plot_data)
         self._update_table_from_plot(plot_data)
         
@@ -143,13 +142,11 @@ class ContentPanel(QWidget):
                 if not hasattr(self, 'param_tau_plot'):
                     self.param_tau_plot = {}
                 self.param_tau_plot = plot_data
-                print(f"[TABLE] Saved tau plot for step {current_step}")
             elif ptype == 'param_m':
                 # M plot'u - ikinci tabloda goster ve sakla
                 if not hasattr(self, 'param_m_plot'):
                     self.param_m_plot = {}
                 self.param_m_plot = plot_data
-                print(f"[TABLE] Saved m plot for step {current_step}")
                 # İki plot da varsa cache'e kaydet
                 if hasattr(self, 'param_tau_plot') and self.param_tau_plot:
                     self.last_plot_data[current_step] = {
@@ -162,14 +159,12 @@ class ContentPanel(QWidget):
         else:
             # Diger adimlar icin normal kaydet
             self.last_plot_data[current_step] = plot_data
-            print(f"[TABLE] Saved plot_data for step {current_step}")
     
     def _update_table_from_plot(self, plot_data: dict):
         """Extract data from plot_data and display in table"""
         from core.timeseries import TimeSeries
         
         ptype = plot_data.get('type', '')
-        print(f"[TABLE] _update_table_from_plot: type={ptype}")
         
         # Extract x, y arrays based on plot type
         x_data = None
@@ -188,12 +183,10 @@ class ContentPanel(QWidget):
         elif ptype == 'linear':
             results = plot_data.get('results', {})
             atype = plot_data.get('analysis_type', 'acf')
-            print(f"[TABLE] Linear: atype={atype}, keys={list(results.keys())}")
             if atype == 'acf':
                 x_data = results.get('lags', np.array([]))
                 y_data = results.get('acf', np.array([]))
                 metadata = {'system': 'ACF', 'value_unit': 'correlation'}
-                print(f"[TABLE] ACF data: lags={len(x_data)}, acf={len(y_data)}")
             elif atype == 'pacf':
                 x_data = results.get('lags', np.array([]))
                 y_data = results.get('pacf', np.array([]))
@@ -213,11 +206,10 @@ class ContentPanel(QWidget):
             
         elif ptype == 'param_m':
             results = plot_data.get('results', {})
-            x_data = results.get('dimensions', np.array([]))  # 'dims' değil 'dimensions'
-            y_data = results.get('fnn', np.array([]))  # 'fnn_pct' değil 'fnn'
+            x_data = results.get('dimensions', np.array([]))
+            y_data = results.get('fnn', np.array([]))
             dt = 1.0
             metadata = {'system': 'FNN (Embedding Dim)', 'value_unit': '%'}
-            print(f"[TABLE] FNN data: dimensions={len(x_data)}, fnn={len(y_data)}")
             
         elif ptype == 'chaos_lyapunov':
             results = plot_data.get('results', {})
@@ -284,7 +276,6 @@ class ContentPanel(QWidget):
         
         # Create TimeSeries and display
         if x_data is not None and y_data is not None and len(x_data) > 0:
-            print(f"[TABLE] Creating table: x={len(x_data)}, y={len(y_data)}, meta={metadata.get('system', 'N/A')}")
             # Use y_data as the main data, x_data becomes time axis
             ts = TimeSeries(data=y_data, dt=dt, metadata=metadata)
             # Override time with x_data
@@ -293,21 +284,16 @@ class ContentPanel(QWidget):
             # Hangi tabloya yazilacagini belirle
             if ptype == 'param_tau':
                 # Tau → Table 1
-                self.data_table_2.setVisible(True)  # İkinci tabloyu goster
+                self.data_table_2.setVisible(True)
                 self.data_table_1.set_data(ts)
-                print("[TABLE] Table 1 (tau) updated!")
             elif ptype == 'param_m':
                 # M → Table 2
-                self.data_table_2.setVisible(True)  # İkinci tabloyu goster
+                self.data_table_2.setVisible(True)
                 self.data_table_2.set_data(ts)
-                print("[TABLE] Table 2 (m) updated!")
             else:
                 # Diger tipler → Table 1, Table 2'yi gizle
                 self.data_table_2.setVisible(False)
                 self.data_table_1.set_data(ts)
-                print("[TABLE] Table 1 updated!")
-        else:
-            print(f"[TABLE] SKIP: x={x_data is not None}, y={y_data is not None}, len={len(x_data) if x_data is not None else 0}")
 
     def on_data_loaded(self, timeseries):
         self.current_data = timeseries
@@ -460,7 +446,6 @@ class ContentPanel(QWidget):
 
     def set_step(self, step_index):
         """Adim degistiginde tabloyu guncelle"""
-        print(f"[TABLE] set_step({step_index}), cache keys={list(self.last_plot_data.keys())}")
         self.stacked_widget.setCurrentIndex(step_index)
         
         # Step 6 (Results) icin data table'i gizle ve max height'i kaldir
@@ -475,11 +460,9 @@ class ContentPanel(QWidget):
         # Eger bu adim icin daha once plot cizilmisse onu goster
         if step_index in self.last_plot_data:
             cached_data = self.last_plot_data[step_index]
-            print(f"[TABLE] Restoring cached plot for step {step_index}")
             
             # Step 3 dual-table mode mu kontrol et
             if isinstance(cached_data, dict) and cached_data.get('dual'):
-                print("[TABLE] Dual-table mode - restoring both tables")
                 self.data_table_2.setVisible(True)
                 self._update_table_from_plot(cached_data['plot1'])  # Tau
                 self._update_table_from_plot(cached_data['plot2'])  # M
@@ -489,7 +472,6 @@ class ContentPanel(QWidget):
                 self._update_table_from_plot(cached_data)
         # Yoksa ham veriyi goster
         elif self.current_data is not None:
-            print(f"[TABLE] No cache for step {step_index}, showing raw data")
             self.data_table_2.setVisible(False)
             self.data_table_1.set_data(self.current_data)
 

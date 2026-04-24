@@ -190,7 +190,6 @@ class ParameterEstimationPanel(QWidget):
         self.progress.setVisible(False)
         self.estimate_tau_button.setEnabled(True)
         self.estimate_m_button.setEnabled(True)
-        print(f"Parameter estimation error: {error_msg}")
     
     def get_parameters(self):
         return {'tau': self.tau, 'm': self.m}

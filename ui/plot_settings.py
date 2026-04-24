@@ -74,8 +74,8 @@ class PlotSettings:
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(self.settings, f, indent=2)
-        except Exception as e:
-            print(f"Failed to save plot settings: {e}")
+        except Exception:
+            pass  # Silent fail
     
     def load(self):
         """Load settings from file"""
@@ -87,6 +87,5 @@ class PlotSettings:
                     for key in self.DEFAULTS:
                         if key in loaded:
                             self.settings[key] = loaded[key]
-        except Exception as e:
-            print(f"Failed to load plot settings: {e}")
+        except Exception:
             self.settings = self.DEFAULTS.copy()
