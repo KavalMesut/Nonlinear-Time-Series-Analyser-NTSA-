@@ -16,6 +16,7 @@ class EmbeddingPanel(QWidget):
     """Embedding görselleştirme paneli"""
     
     plot_requested = Signal(dict)
+    embedding_complete = Signal(dict)  # tau, m bilgisini gönder
     
     def __init__(self, translation_manager):
         super().__init__()
@@ -174,6 +175,9 @@ class EmbeddingPanel(QWidget):
         
         self.plot_requested.emit(plot_data)
         
+        # Emit embedding complete with tau, m
+        self.embedding_complete.emit({'tau': tau, 'm': m if m else 2})
+        
         # Mark phase space step as completed
         main_window = self.window()
         if hasattr(main_window, 'steps_panel'):
@@ -207,11 +211,16 @@ class EmbeddingPanel(QWidget):
         }
         
         self.plot_requested.emit(plot_data)
+        
+        # Emit embedding complete with tau, m
+        self.embedding_complete.emit({'tau': tau, 'm': m})
     
     def _plot_return_map(self):
         """Geri dönüş haritası: x(t) vs x(t+1)"""
         if self.current_data is None:
             return
+        
+        tau, m = self._get_params()
         
         data = self.current_data.data
         
@@ -228,6 +237,10 @@ class EmbeddingPanel(QWidget):
         }
         
         self.plot_requested.emit(plot_data)
+        
+        # Emit embedding complete with tau, m
+        if tau and m:
+            self.embedding_complete.emit({'tau': tau, 'm': m})
     
     def _plot_multi_dim(self):
         """Çok-boyutlu izdüşüm (gelecekte eklenecek)"""

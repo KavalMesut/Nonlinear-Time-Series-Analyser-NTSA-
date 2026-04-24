@@ -70,6 +70,7 @@ class ContentPanel(QWidget):
         # 4 — Phase Space (Embedding Visualization)
         self.embedding_panel = EmbeddingPanel(self.tm)
         self.embedding_panel.plot_requested.connect(self._forward_plot)
+        self.embedding_panel.embedding_complete.connect(self.on_embedding_complete)
         self.stacked_widget.addWidget(self.embedding_panel)
 
         # 5 — Chaos Analysis
@@ -378,6 +379,13 @@ class ContentPanel(QWidget):
             # Chaos panel'e parametreleri gönder
             self.chaos_panel.set_data(self.current_data, tau, m)
 
+    def on_embedding_complete(self, params):
+        """Embedding tamamlandığında results panel'i güncelle"""
+        tau = params.get('tau')
+        m = params.get('m')
+        if tau and m:
+            self.results_panel.update_phase_space(tau=tau, m=m)
+
     def on_chaos_analysis_complete(self, results):
         # Results panel'i guncelle
         self.results_panel.update_chaos_analysis(
@@ -454,6 +462,13 @@ class ContentPanel(QWidget):
         """Adim degistiginde tabloyu guncelle"""
         print(f"[TABLE] set_step({step_index}), cache keys={list(self.last_plot_data.keys())}")
         self.stacked_widget.setCurrentIndex(step_index)
+        
+        # Step 6 (Results) icin data table'i gizle
+        if step_index == 6:
+            self.table_splitter.setVisible(False)
+            return
+        else:
+            self.table_splitter.setVisible(True)
         
         # Eger bu adim icin daha once plot cizilmisse onu goster
         if step_index in self.last_plot_data:
