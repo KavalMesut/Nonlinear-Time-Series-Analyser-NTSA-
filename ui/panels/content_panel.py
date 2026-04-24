@@ -89,11 +89,11 @@ class ContentPanel(QWidget):
         self.table_splitter = QSplitter(Qt.Horizontal)
         
         self.data_table_1 = DataTablePanel(self.tm)
-        self.data_table_1.setMinimumHeight(200)
+        self.data_table_1.setMinimumHeight(150)  # Daha esnek minimum
         self.table_splitter.addWidget(self.data_table_1)
         
         self.data_table_2 = DataTablePanel(self.tm)
-        self.data_table_2.setMinimumHeight(200)
+        self.data_table_2.setMinimumHeight(150)  # Daha esnek minimum
         self.data_table_2.setVisible(False)  # Başlangıçta gizli
         self.table_splitter.addWidget(self.data_table_2)
         
