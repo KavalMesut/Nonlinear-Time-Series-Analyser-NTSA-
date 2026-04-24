@@ -27,6 +27,10 @@ class ContentPanel(QWidget):
         self.tm = translation_manager
         self.theme_manager = theme_manager
         self.current_data = None
+        
+        # Her adim icin son cizilen plot verisini sakla
+        self.last_plot_data = {}  # {step_index: plot_data}
+        
         self.init_ui()
 
     def init_ui(self):
@@ -108,6 +112,10 @@ class ContentPanel(QWidget):
         """Forward plot request and update data table"""
         self.plot_requested.emit(plot_data)
         self._update_table_from_plot(plot_data)
+        
+        # Hangi adimdan geldigini tespit et ve sakla
+        current_step = self.stacked_widget.currentIndex()
+        self.last_plot_data[current_step] = plot_data
     
     def _update_table_from_plot(self, plot_data: dict):
         """Extract data from plot_data and display in table"""
@@ -238,12 +246,16 @@ class ContentPanel(QWidget):
         self.data_table.set_data(timeseries)
 
         # Grafik panele zaman serisi gonder
-        self.plot_requested.emit({
+        plot_data = {
             'type': 'timeseries',
             'time': timeseries.time,
             'data': timeseries.data,
             'metadata': timeseries.metadata
-        })
+        }
+        self.plot_requested.emit(plot_data)
+        
+        # Step 0 icin plot data'yi sakla
+        self.last_plot_data[0] = plot_data
 
         # Adimlari ac ve ilk adimi tamamlanmis olarak isaretle
         main_window = self.window()
@@ -289,6 +301,12 @@ class ContentPanel(QWidget):
         self.current_data = timeseries
         self.data_table.set_data(timeseries)
         
+        # Preprocessing sonrasi analiz sonuclarini sifirla (cunku veri degisti)
+        # Step 2-6 icin kaydedilmis plot'lari temizle
+        for step in [2, 3, 4, 5, 6]:
+            if step in self.last_plot_data:
+                del self.last_plot_data[step]
+        
         # Mark preprocessing as completed
         main_window = self.window()
         if hasattr(main_window, 'steps_panel'):
@@ -307,6 +325,7 @@ class ContentPanel(QWidget):
         """Tüm panelleri sıfırla (yeni analiz için)"""
         self.current_data = None
         self.data_table.clear_table()
+        self.last_plot_data.clear()  # Tum kaydedilmis plot'lari sil
         self.stacked_widget.setCurrentIndex(0)  # Data Load paneline dön
         
         # Her paneli sıfırla
@@ -324,8 +343,11 @@ class ContentPanel(QWidget):
         """Adim degistiginde tabloyu guncelle"""
         self.stacked_widget.setCurrentIndex(step_index)
         
-        # Her adimda current_data varsa tabloda goster
-        if self.current_data is not None:
+        # Eger bu adim icin daha once plot cizilmisse onu goster
+        if step_index in self.last_plot_data:
+            self._update_table_from_plot(self.last_plot_data[step_index])
+        # Yoksa ham veriyi goster
+        elif self.current_data is not None:
             self.data_table.set_data(self.current_data)
 
     def update_plot_theme(self):
