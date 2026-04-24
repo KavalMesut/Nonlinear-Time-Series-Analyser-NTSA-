@@ -463,12 +463,14 @@ class ContentPanel(QWidget):
         print(f"[TABLE] set_step({step_index}), cache keys={list(self.last_plot_data.keys())}")
         self.stacked_widget.setCurrentIndex(step_index)
         
-        # Step 6 (Results) icin data table'i gizle
+        # Step 6 (Results) icin data table'i gizle ve max height'i kaldir
         if step_index == 6:
             self.table_splitter.setVisible(False)
+            self.stacked_widget.setMaximumHeight(16777215)  # Qt max value - no limit
             return
         else:
             self.table_splitter.setVisible(True)
+            self.stacked_widget.setMaximumHeight(550)  # Restore limit for other panels
         
         # Eger bu adim icin daha once plot cizilmisse onu goster
         if step_index in self.last_plot_data:
