@@ -82,9 +82,9 @@ class ContentPanel(QWidget):
         placeholder7.setAlignment(Qt.AlignCenter)
         self.stacked_widget.addWidget(placeholder7)
 
-        # Stacked widget'in boyutunu sinirla ve size policy ayarla
+        # Stacked widget'in boyutunu sinirla - tum butonlarin gorunmesi icin yeterli
         from PySide6.QtWidgets import QSizePolicy
-        self.stacked_widget.setMaximumHeight(350)
+        self.stacked_widget.setMaximumHeight(550)  # Daha buyuk - tum paneller sigar
         self.stacked_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         
         self.vsplitter.addWidget(self.stacked_widget)
