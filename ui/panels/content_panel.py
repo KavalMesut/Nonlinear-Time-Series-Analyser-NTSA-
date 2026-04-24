@@ -80,9 +80,12 @@ class ContentPanel(QWidget):
 
         self.vsplitter.addWidget(self.stacked_widget)
 
-        # Veri tablosunu DataLoadPanel icine gom
+        # --- Alt: Data Table (tum adimlar icin ortak) ---
         self.data_table = DataTablePanel(self.tm)
-        self.data_load_panel.set_table_widget(self.data_table)
+        self.vsplitter.addWidget(self.data_table)
+        
+        # Splitter oranlari: %60 kontroller, %40 tablo
+        self.vsplitter.setSizes([600, 400])
 
         # Splitter handle stilini ayarla (gorunur yap)
         self.vsplitter.setHandleWidth(6)
@@ -99,7 +102,131 @@ class ContentPanel(QWidget):
         layout.addWidget(self.vsplitter)
 
     def _forward_plot(self, plot_data: dict):
+        """Forward plot request and update data table"""
         self.plot_requested.emit(plot_data)
+        self._update_table_from_plot(plot_data)
+    
+    def _update_table_from_plot(self, plot_data: dict):
+        """Extract data from plot_data and display in table"""
+        from core.timeseries import TimeSeries
+        
+        ptype = plot_data.get('type', '')
+        
+        # Extract x, y arrays based on plot type
+        x_data = None
+        y_data = None
+        dt = 1.0
+        metadata = {}
+        
+        if ptype == 'timeseries':
+            x_data = plot_data.get('time', np.array([]))
+            y_data = plot_data.get('data', np.array([]))
+            dt = x_data[1] - x_data[0] if len(x_data) > 1 else 1.0
+            metadata = plot_data.get('metadata', {})
+            if not metadata:
+                metadata = {'system': 'Time Series'}
+            
+        elif ptype == 'linear':
+            results = plot_data.get('results', {})
+            atype = plot_data.get('analysis_type', 'acf')
+            if atype == 'acf':
+                x_data = results.get('lags', np.array([]))
+                y_data = results.get('acf', np.array([]))
+                metadata = {'system': 'ACF', 'value_unit': 'correlation'}
+            elif atype == 'pacf':
+                x_data = results.get('lags', np.array([]))
+                y_data = results.get('pacf', np.array([]))
+                metadata = {'system': 'PACF', 'value_unit': 'correlation'}
+            elif atype == 'fft':
+                x_data = results.get('frequencies', np.array([]))
+                y_data = results.get('power', np.array([]))
+                metadata = {'system': 'FFT Power Spectrum', 'value_unit': 'power'}
+            dt = 1.0
+            
+        elif ptype == 'param_tau':
+            results = plot_data.get('results', {})
+            x_data = results.get('lags', np.array([]))
+            y_data = results.get('ami', np.array([]))
+            dt = 1.0
+            metadata = {'system': 'AMI (Time Delay)', 'value_unit': 'bits'}
+            
+        elif ptype == 'param_m':
+            results = plot_data.get('results', {})
+            x_data = results.get('dims', np.array([]))
+            y_data = results.get('fnn_pct', np.array([]))
+            dt = 1.0
+            metadata = {'system': 'FNN (Embedding Dim)', 'value_unit': '%'}
+            
+        elif ptype == 'chaos_lyapunov':
+            results = plot_data.get('results', {})
+            if 't_steps' in results and 'divergence' in results:
+                x_data = results.get('t_steps', np.array([]))
+                y_data = results.get('divergence', np.array([]))
+                dt = x_data[1] - x_data[0] if len(x_data) > 1 else 1.0
+                metadata = {'system': 'Lyapunov Divergence'}
+            else:
+                # Single point
+                x_data = np.array([0])
+                y_data = np.array([results.get('lyapunov', 0)])
+                dt = 1.0
+                metadata = {'system': 'Lyapunov Exponent'}
+        
+        elif ptype == 'chaos_spectrum':
+            exponents = plot_data.get('exponents', np.array([]))
+            x_data = np.arange(len(exponents))
+            y_data = exponents
+            dt = 1.0
+            metadata = {'system': 'Lyapunov Spectrum', 'value_unit': 'nats/s'}
+        
+        elif ptype == 'chaos_correlation':
+            results = plot_data.get('results', {})
+            radii = results.get('radii', np.array([]))
+            c_r = results.get('c_r', np.array([]))
+            valid = c_r > 0
+            if np.any(valid):
+                x_data = np.log(radii[valid])
+                y_data = np.log(c_r[valid])
+            else:
+                x_data = np.array([])
+                y_data = np.array([])
+            dt = 1.0
+            metadata = {'system': 'Correlation Dimension', 'value_unit': 'log(C(r))'}
+        
+        elif ptype == 'preprocessing':
+            x_data = plot_data.get('time_processed', np.array([]))
+            y_data = plot_data.get('data_processed', np.array([]))
+            dt = x_data[1] - x_data[0] if len(x_data) > 1 else 1.0
+            op = plot_data.get('operation', 'Unknown')
+            metadata = {'system': f'Preprocessing: {op}'}
+        
+        elif ptype == 'embedding_2d':
+            embedded = plot_data.get('embedded', np.array([]))
+            if embedded.ndim == 2 and embedded.shape[1] >= 2:
+                x_data = embedded[:, 0]
+                y_data = embedded[:, 1]
+            else:
+                x_data = np.array([])
+                y_data = np.array([])
+            dt = 1.0
+            metadata = {'system': '2D Phase Space'}
+        
+        elif ptype == 'return_map':
+            x_data = plot_data.get('x', np.array([]))
+            y_data = plot_data.get('y', np.array([]))
+            dt = 1.0
+            metadata = {'system': 'Return Map'}
+        
+        else:
+            # Unknown type, don't update table
+            return
+        
+        # Create TimeSeries and display
+        if x_data is not None and y_data is not None and len(x_data) > 0:
+            # Use y_data as the main data, x_data becomes time axis
+            ts = TimeSeries(data=y_data, dt=dt, metadata=metadata)
+            # Override time with x_data
+            ts.time = x_data
+            self.data_table.set_data(ts)
 
     def on_data_loaded(self, timeseries):
         self.current_data = timeseries

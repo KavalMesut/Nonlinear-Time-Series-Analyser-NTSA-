@@ -160,16 +160,8 @@ class DataLoadPanel(QWidget):
         self.load_button.setMinimumHeight(40)
         layout.addWidget(self.load_button)
         
-        # Veri tablosu buraya eklenecek (content_panel tarafindan)
-        self.table_placeholder = QVBoxLayout()
-        layout.addLayout(self.table_placeholder)
-        
         # Initial state
         self.on_source_changed()
-    
-    def set_table_widget(self, table_widget):
-        """Veri tablosunu butonun hemen altina yerlestirir"""
-        self.table_placeholder.addWidget(table_widget)
     
     def on_source_changed(self):
         """Handle source type change"""
