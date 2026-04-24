@@ -5,5 +5,6 @@ from .steps_panel import StepsPanel
 from .content_panel import ContentPanel
 from .data_load_panel import DataLoadPanel
 from .plot_panel import PlotPanel
+from .results_summary_panel import ResultsSummaryPanel
 
-__all__ = ['StepsPanel', 'ContentPanel', 'DataLoadPanel', 'PlotPanel']
+__all__ = ['StepsPanel', 'ContentPanel', 'DataLoadPanel', 'PlotPanel', 'ResultsSummaryPanel']
