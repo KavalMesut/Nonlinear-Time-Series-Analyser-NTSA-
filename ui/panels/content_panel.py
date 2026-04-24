@@ -103,9 +103,9 @@ class ContentPanel(QWidget):
         self.vsplitter.addWidget(self.table_splitter)
         
         # Splitter oranlarini sonra set et (window resize sonrasi)
-        # %40 kontroller, %60 tablo olacak sekilde
+        # %30 kontroller, %70 tablo olacak sekilde
         from PySide6.QtCore import QTimer
-        QTimer.singleShot(100, lambda: self.vsplitter.setSizes([4000, 6000]))
+        QTimer.singleShot(100, lambda: self.vsplitter.setSizes([3000, 7000]))
 
         # Splitter handle stilini ayarla (gorunur yap)
         self.vsplitter.setHandleWidth(6)
