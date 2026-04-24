@@ -24,17 +24,21 @@ class ResultsSummaryPanel(QWidget):
     def init_ui(self):
         # Main layout - no scroll
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(10, 5, 10, 10)
+        layout.setSpacing(10)
         
-        # Title
+        # Title - left aligned
         title = QLabel("📊 Analiz Sonuçları Özeti")
-        title.setStyleSheet("font-size: 18pt; font-weight: bold; color: #268bd2;")
+        title.setStyleSheet("font-size: 16pt; font-weight: bold; color: #268bd2;")
+        title.setAlignment(Qt.AlignLeft)
         layout.addWidget(title)
         
         # Results cards grid - 2 rows x 3 columns for better spacing
         self.cards_layout = QGridLayout()
         self.cards_layout.setSpacing(15)
         self.cards_layout.setColumnStretch(0, 1)
+        self.cards_layout.setColumnStretch(1, 1)
+        self.cards_layout.setColumnStretch(2, 1)
         self.cards_layout.setColumnStretch(1, 1)
         self.cards_layout.setColumnStretch(2, 1)
         
