@@ -103,9 +103,9 @@ class ContentPanel(QWidget):
         self.vsplitter.addWidget(self.table_splitter)
         
         # Splitter oranlarini sonra set et (window resize sonrasi)
-        # %60 kontroller, %40 tablo olacak sekilde
+        # %40 kontroller, %60 tablo olacak sekilde
         from PySide6.QtCore import QTimer
-        QTimer.singleShot(100, lambda: self.vsplitter.setSizes([6000, 4000]))
+        QTimer.singleShot(100, lambda: self.vsplitter.setSizes([4000, 6000]))
 
         # Splitter handle stilini ayarla (gorunur yap)
         self.vsplitter.setHandleWidth(6)
@@ -208,10 +208,11 @@ class ContentPanel(QWidget):
             
         elif ptype == 'param_m':
             results = plot_data.get('results', {})
-            x_data = results.get('dims', np.array([]))
-            y_data = results.get('fnn_pct', np.array([]))
+            x_data = results.get('dimensions', np.array([]))  # 'dims' değil 'dimensions'
+            y_data = results.get('fnn', np.array([]))  # 'fnn_pct' değil 'fnn'
             dt = 1.0
             metadata = {'system': 'FNN (Embedding Dim)', 'value_unit': '%'}
+            print(f"[TABLE] FNN data: dimensions={len(x_data)}, fnn={len(y_data)}")
             
         elif ptype == 'chaos_lyapunov':
             results = plot_data.get('results', {})
