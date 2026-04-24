@@ -30,6 +30,7 @@ class DataLoadPanel(QWidget):
         # Source selection
         source_group = QGroupBox(self.tm('data_source'))
         source_layout = QVBoxLayout()
+        source_layout.setSpacing(8)  # Add spacing between radio buttons
         
         # Radio buttons for source type (styled as toggle buttons)
         self.source_group = QButtonGroup()

@@ -100,9 +100,6 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage(self.tr('msg_info') + ': ' + 
                                    self.tr('window_title'))
-        
-        # Maximize window after all UI is set up
-        self.showMaximized()
     
     def create_menu_bar(self):
         """Create menu bar"""

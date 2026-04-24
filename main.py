@@ -17,7 +17,7 @@ def main():
     
     # Create and show main window
     window = MainWindow()
-    window.show()
+    window.showMaximized()  # Show maximized directly
     
     sys.exit(app.exec())
 

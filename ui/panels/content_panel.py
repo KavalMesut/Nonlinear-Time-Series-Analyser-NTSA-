@@ -321,7 +321,38 @@ class ContentPanel(QWidget):
             self.chaos_panel.m = None
 
     def set_step(self, step_index):
+        """Adim degistiginde tabloyu guncelle"""
         self.stacked_widget.setCurrentIndex(step_index)
+        
+        # Her adimda ilgili veriyi tabloda goster
+        if step_index == 0:  # Data Load
+            # Ham veriyi goster (zaten yuklu)
+            if self.current_data:
+                self.data_table.set_data(self.current_data)
+        elif step_index == 1:  # Preprocessing
+            # Preprocessing sonrasi veriyi goster
+            if self.current_data:
+                self.data_table.set_data(self.current_data)
+        elif step_index == 2:  # Linear Analysis
+            # Ham veriyi goster (analizler grafik uzerinde)
+            if self.current_data:
+                self.data_table.set_data(self.current_data)
+        elif step_index == 3:  # Parameter Estimation
+            # Ham veriyi goster
+            if self.current_data:
+                self.data_table.set_data(self.current_data)
+        elif step_index == 4:  # Phase Space
+            # Ham veriyi goster
+            if self.current_data:
+                self.data_table.set_data(self.current_data)
+        elif step_index == 5:  # Chaos Analysis
+            # Ham veriyi goster
+            if self.current_data:
+                self.data_table.set_data(self.current_data)
+        elif step_index == 6:  # Results
+            # Summary goster
+            if self.current_data:
+                self.data_table.set_data(self.current_data)
 
     def update_plot_theme(self):
         pass
