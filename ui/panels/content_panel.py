@@ -110,18 +110,21 @@ class ContentPanel(QWidget):
 
     def _forward_plot(self, plot_data: dict):
         """Forward plot request and update data table"""
+        print(f"[TABLE] _forward_plot: type={plot_data.get('type')}")
         self.plot_requested.emit(plot_data)
         self._update_table_from_plot(plot_data)
         
         # Hangi adimdan geldigini tespit et ve sakla
         current_step = self.stacked_widget.currentIndex()
         self.last_plot_data[current_step] = plot_data
+        print(f"[TABLE] Saved plot_data for step {current_step}")
     
     def _update_table_from_plot(self, plot_data: dict):
         """Extract data from plot_data and display in table"""
         from core.timeseries import TimeSeries
         
         ptype = plot_data.get('type', '')
+        print(f"[TABLE] _update_table_from_plot: type={ptype}")
         
         # Extract x, y arrays based on plot type
         x_data = None
@@ -140,10 +143,12 @@ class ContentPanel(QWidget):
         elif ptype == 'linear':
             results = plot_data.get('results', {})
             atype = plot_data.get('analysis_type', 'acf')
+            print(f"[TABLE] Linear: atype={atype}, keys={list(results.keys())}")
             if atype == 'acf':
                 x_data = results.get('lags', np.array([]))
                 y_data = results.get('acf', np.array([]))
                 metadata = {'system': 'ACF', 'value_unit': 'correlation'}
+                print(f"[TABLE] ACF data: lags={len(x_data)}, acf={len(y_data)}")
             elif atype == 'pacf':
                 x_data = results.get('lags', np.array([]))
                 y_data = results.get('pacf', np.array([]))
@@ -233,11 +238,15 @@ class ContentPanel(QWidget):
         
         # Create TimeSeries and display
         if x_data is not None and y_data is not None and len(x_data) > 0:
+            print(f"[TABLE] Creating table: x={len(x_data)}, y={len(y_data)}, meta={metadata.get('system', 'N/A')}")
             # Use y_data as the main data, x_data becomes time axis
             ts = TimeSeries(data=y_data, dt=dt, metadata=metadata)
             # Override time with x_data
             ts.time = x_data
             self.data_table.set_data(ts)
+            print("[TABLE] Table updated!")
+        else:
+            print(f"[TABLE] SKIP: x={x_data is not None}, y={y_data is not None}, len={len(x_data) if x_data is not None else 0}")
 
     def on_data_loaded(self, timeseries):
         self.current_data = timeseries
@@ -341,13 +350,16 @@ class ContentPanel(QWidget):
 
     def set_step(self, step_index):
         """Adim degistiginde tabloyu guncelle"""
+        print(f"[TABLE] set_step({step_index}), cache keys={list(self.last_plot_data.keys())}")
         self.stacked_widget.setCurrentIndex(step_index)
         
         # Eger bu adim icin daha once plot cizilmisse onu goster
         if step_index in self.last_plot_data:
+            print(f"[TABLE] Restoring cached plot for step {step_index}")
             self._update_table_from_plot(self.last_plot_data[step_index])
         # Yoksa ham veriyi goster
         elif self.current_data is not None:
+            print(f"[TABLE] No cache for step {step_index}, showing raw data")
             self.data_table.set_data(self.current_data)
 
     def update_plot_theme(self):
