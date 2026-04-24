@@ -4,7 +4,7 @@ Shows summary cards for all completed analysis steps.
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
-    QLabel, QPushButton, QScrollArea, QGridLayout
+    QLabel, QPushButton, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -24,15 +24,9 @@ class ResultsSummaryPanel(QWidget):
         self.init_ui()
     
     def init_ui(self):
-        # Main scroll area
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        
-        # Content widget
-        content_widget = QWidget()
-        layout = QVBoxLayout(content_widget)
+        # Main layout - no scroll
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # Title
         title = QLabel("📊 Analiz Sonuçları Özeti")
@@ -122,12 +116,6 @@ class ResultsSummaryPanel(QWidget):
         layout.addWidget(interp_group)
         
         layout.addStretch()
-        
-        # Add scroll to main layout
-        scroll.setWidget(content_widget)
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addWidget(scroll)
     
     def _create_card(self, title, fields):
         """Create a summary card with title and field rows."""
