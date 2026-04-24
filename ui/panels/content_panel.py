@@ -82,6 +82,11 @@ class ContentPanel(QWidget):
         placeholder7.setAlignment(Qt.AlignCenter)
         self.stacked_widget.addWidget(placeholder7)
 
+        # Stacked widget'in boyutunu sinirla ve size policy ayarla
+        from PySide6.QtWidgets import QSizePolicy
+        self.stacked_widget.setMaximumHeight(350)
+        self.stacked_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        
         self.vsplitter.addWidget(self.stacked_widget)
 
         # --- Alt: Data Tables (tum adimlar icin ortak) ---
