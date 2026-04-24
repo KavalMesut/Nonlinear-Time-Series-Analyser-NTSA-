@@ -5,7 +5,7 @@ Sadece kontroller — grafik PlotPanel'de gosterilir.
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QGroupBox, QLabel, QSpinBox, QDoubleSpinBox,
-    QFormLayout, QProgressBar, QTextEdit, QComboBox
+    QFormLayout, QProgressBar, QTextEdit, QComboBox, QScrollArea
 )
 from PySide6.QtCore import Qt, Signal, QThread
 import numpy as np
@@ -92,7 +92,15 @@ class ChaosAnalysisPanel(QWidget):
         self.init_ui()
     
     def init_ui(self):
-        layout = QVBoxLayout(self)
+        # Ana scroll area olustur
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        # Scroll icinde widget
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         
         # Parameters
         params_group = QGroupBox("Parameters")
@@ -202,6 +210,12 @@ class ChaosAnalysisPanel(QWidget):
         layout.addWidget(self.status_label)
         
         layout.addStretch()
+        
+        # Scroll area'yi main layout'a ekle
+        scroll.setWidget(content_widget)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(scroll)
     
     def set_data(self, timeseries, tau, m):
         self.current_data = timeseries
