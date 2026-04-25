@@ -344,31 +344,31 @@ class HighContrastTheme(Theme):
 
 
 class ScientificTheme(Theme):
-    """Scientific theme based on Solarized colors"""
+    """Scientific theme based on teal-green palette (#31585c)"""
     
     def __init__(self):
         super().__init__()
         self.name = "Scientific"
         
-        # Solarized Dark palette
+        # Teal-green palette around #31585c
         self.colors = {
-            'background': '#002b36',  # base03
-            'background_secondary': '#073642',  # base02
-            'background_tertiary': '#586e75',  # base01
-            'foreground': '#839496',  # base0
-            'foreground_secondary': '#657b83',  # base00
-            'accent': '#268bd2',  # blue
-            'accent_hover': '#2aa198',  # cyan
-            'border': '#073642',
-            'selection': '#094555',
-            'error': '#dc322f',  # red
-            'warning': '#b58900',  # yellow
-            'success': '#859900',  # green
-            'plot_bg': '#002b36',
-            'plot_grid': '#073642',
-            'plot_text': '#839496',
-            'violet': '#6c71c4',
-            'magenta': '#d33682'
+            'background': '#1a2e30',        # Darker base
+            'background_secondary': '#213a3d',  # Slightly lighter
+            'background_tertiary': '#2a4649',   # Medium
+            'foreground': '#d4e4e5',        # Light text
+            'foreground_secondary': '#9db9bb',  # Muted text
+            'accent': '#31585c',            # Main color
+            'accent_hover': '#3d6e73',      # Lighter hover
+            'border': '#2a4649',
+            'selection': '#31585c',
+            'error': '#d9534f',             # Red
+            'warning': '#f0ad4e',           # Orange
+            'success': '#5cb85c',           # Green
+            'plot_bg': '#1a2e30',
+            'plot_grid': '#2a4649',
+            'plot_text': '#d4e4e5',
+            'violet': '#7e8aa2',
+            'magenta': '#b66d8f'
         }
         
         self.stylesheet = f"""
