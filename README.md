@@ -1,49 +1,63 @@
 # Time Series Analyser (TSA)
 
-Kaotik zaman serilerinin doğrusal olmayan analizi icin gelistirilmis masaustu uygulamasi. Veri yukleme, parametre tahmini (AMI + FNN), Lyapunov ustel hesaplama (Wolf & Rosenstein) ve korelasyon boyutu analizini tek bir pipeline icerisinde sunar.
+A desktop application for nonlinear analysis of chaotic time series. Provides data loading, parameter estimation (AMI + FNN), Lyapunov exponent computation (Wolf & Rosenstein), and correlation dimension analysis in a unified pipeline.
 
-## Ozellikler
+## Features
 
-- **10 Kaotik Sistem Ureteci**: Lorenz, Rossler, Chua, Chen, Duffing, Logistic, Henon, Tent, Sine, Ikeda
-- **12 Preprocessing Fonksiyonu**: Normalize, detrend, outlier removal, smooth, difference, resample, filter, log/boxcox transform, windowing, denoise
-- **Otomatik Parametre Tahmini**: AMI (gecikme suresi tau) ve FNN (gomme boyutu m) ile veri tabanli parametre secimi
-- **Faz Uzayi Gorsellestirme**: 2D/3D phase space, return map, atraktör yapısı
-- **Wolf Lyapunov Algoritmasi**: Orijinal MATLAB koduna sadik implementasyon (KD-Tree tabanli komsu arama)
-- **Rosenstein Lyapunov Algoritmasi**: Otomatik egri uydurmali (auto-fit) en buyuk Lyapunov usteli hesaplama
-- **Korelasyon Boyutu**: Grassberger-Procaccia algoritmasi
-- **Dogrusal Analizler**: ACF, PACF, FFT (Hann/Hamming/Blackman pencerele)
-- **Export/Session Yönetimi**: CSV/PNG/JSON export, analiz durumunu kaydet/yükle (.tsa/.json)
-- **Split Plot Panel**: Üst/alt grafik karşılaştırma, 20 grafik geçmişi, auto-range
-- **Pipeline Motoru**: Bagimlilik cozumlemeli, onbellekli analiz zinciri
-- **PySide6 Arayuz**: PyQtGraph tabanli gorselleestirme
-- **Performans**: scipy KD-Tree, vektorize islemler (~43 saniye / 10 sistem validasyonu)
+- **10 Chaotic System Generators**: Lorenz, Rössler, Chua, Chen, Duffing, Logistic, Hénon, Tent, Sine, Ikeda
+- **12 Preprocessing Functions**: Normalize, detrend, outlier removal, smooth, difference, resample, filter, log/boxcox transform, windowing, denoise
+- **Automatic Parameter Estimation**: AMI (time delay tau) and FNN (embedding dimension m) data-driven selection
+- **Phase Space Visualization**: 2D/3D phase space, return map, attractor structure
+- **Wolf Lyapunov Algorithm**: Faithful implementation of original MATLAB code (KD-Tree based neighbor search)
+- **Rosenstein Lyapunov Algorithm**: Auto-fit largest Lyapunov exponent calculation with multiple window sizes
+- **Correlation Dimension**: Grassberger-Procaccia algorithm
+- **Linear Analysis**: ACF, PACF, FFT (Hann/Hamming/Blackman windows)
+- **Export/Session Management**: CSV/PNG/JSON export, save/load analysis state (.tsa/.json)
+- **Split Plot Panel**: Top/bottom plot comparison, 20 plot history, auto-range
+- **Pipeline Engine**: Dependency-resolved, cached analysis chain
+- **PySide6 Interface**: PyQtGraph-based visualization
+- **Performance**: scipy KD-Tree, vectorized operations (~43 seconds / 10 system validation)
 
-## Validasyon Sonuclari
+## UI Features - Step Icons
 
-10 kaotik sistem uzerinde dogrulama (7/10 sistem icin <%10 hata):
+The left sidebar displays 7 analysis steps with custom-designed icons:
 
-| Sistem | Analitik LE | Hesaplanan LE | Hata % | Yontem |
+1. **📦 Data Loading** - Box with upload arrows and 3 dots (file transfer)
+2. **🔽 Preprocessing** - Filter funnel (data cleaning & transformation)
+3. **📊 Linear Analysis** - Bar chart (statistical analysis)
+4. **🎚️ Parameter Estimation** - Dual sliders τ and m (embedding parameters)
+5. **🌀 Phase Space** - 3D orbital trajectory (phase space embedding)
+6. **🌊 Chaos Analysis** - Lorenz attractor pattern (nonlinear dynamics)
+7. **📄 Results** - Document icon (final analysis output)
+
+Each step is locked until its dependencies complete. Icons change color based on step state (locked → unlocked → active → completed).
+
+## Validation Results
+
+Validation across 10 chaotic systems (7/10 systems with <10% error):
+
+| System | Analytical LE | Computed LE | Error % | Method |
 |--------|------------|---------------|--------|--------|
 | Lorenz | 0.9056 | 1.0044 | 10.9% | Rosenstein |
-| Rossler | 0.0714 | 0.0579 | 19.0% | Rosenstein |
+| Rössler | 0.0714 | 0.0579 | 19.0% | Rosenstein |
 | Chua | 0.33 | 0.3619 | 9.7% | Rosenstein |
 | Chen | 2.027 | 1.9179 | 5.4% | Rosenstein |
 | Duffing | 0.16 | 0.0834 | 47.9% | Rosenstein |
 | Logistic (r=4) | 0.6931 | 0.6927 | 0.1% | Rosenstein |
-| Henon | 0.4200 | 0.4200 | 0.0% | Rosenstein |
+| Hénon | 0.4200 | 0.4200 | 0.0% | Rosenstein |
 | Tent | 0.6931 | 0.6948 | 0.2% | Rosenstein |
 | Sine | 0.6931 | 0.6889 | 0.6% | Rosenstein |
 | Ikeda | 0.51 | 0.4858 | 4.7% | Rosenstein |
 
-## Kurulum
+## Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**Gereksinimler**: Python >= 3.8, numpy, scipy >= 1.7.0, PySide6, pyqtgraph
+**Requirements**: Python >= 3.8, numpy, scipy >= 1.7.0, PySide6, pyqtgraph
 
-## Hizli Baslangic
+## Quick Start
 
 ```python
 from core.generators import generate_lorenz
@@ -51,20 +65,20 @@ from analysis.ami import compute_ami, find_first_minimum
 from analysis.fnn import compute_fnn, find_embedding_dimension
 from analysis.lyapunov import lyapunov_rosenstein, lyapunov_wolf
 
-# Lorenz zaman serisi uret
+# Generate Lorenz time series
 ts = generate_lorenz(dt=0.01, n_steps=10000, transient=2000)
 data = ts.data
 
-# Parametre tahmini (veri tabanli)
+# Parameter estimation (data-driven)
 ami_values = compute_ami(data, max_lag=100)
 tau = find_first_minimum(ami_values)
 
 fnn_values = compute_fnn(data, tau=tau, max_dim=10)
 m = find_embedding_dimension(fnn_values, threshold=1.0)
 
-# Rosenstein ile Lyapunov usteli
+# Rosenstein Lyapunov exponent
 time_steps, divergence = lyapunov_rosenstein(data, m=m, tau=tau, dt=ts.dt)
-# Wolf ile Lyapunov usteli
+# Wolf Lyapunov exponent
 le_wolf = lyapunov_wolf(data, m=m, tau=tau, dt=ts.dt)
 
 print(f"tau={tau}, m={m}")
@@ -72,177 +86,258 @@ print(f"Rosenstein LE: {divergence:.4f}")
 print(f"Wolf LE: {le_wolf:.4f}")
 ```
 
-### Arayuzu Baslatma
+### Launching the UI
 
 ```bash
 python main.py
 ```
 
-## Proje Yapisi
+## Project Structure
 
 ```
 tseriesanalyser/
-├── core/                   # Veri yapilari ve ureticiler
-│   ├── timeseries.py       # TimeSeries sinifi
-│   ├── generators.py       # 10 kaotik sistem ureteci
-│   ├── integrators.py      # RK4 integrator + ODE sistemleri
-│   ├── loaders.py          # CSV/TXT dosya yukleyici
-│   ├── preprocessing.py    # 12 preprocessing fonksiyonu
+├── core/                   # Data structures and generators
+│   ├── timeseries.py       # TimeSeries class
+│   ├── generators.py       # 10 chaotic system generators
+│   ├── integrators.py      # RK4 integrator + ODE systems
+│   ├── loaders.py          # CSV/TXT file loader
+│   ├── preprocessing.py    # 12 preprocessing functions
 │   ├── export.py           # CSV/PNG/JSON export
-│   └── session.py          # Analiz oturumu kaydet/yükle
-├── analysis/               # Analiz algoritmalari
-│   ├── ami.py              # Ortalama Karsilikli Bilgi (tau tahmini)
-│   ├── fnn.py              # Yanlis En Yakin Komsular (m tahmini)
-│   ├── embedding.py        # Zaman gecikmeli gomme
-│   ├── lyapunov.py         # Wolf + Rosenstein Lyapunov usteli
-│   ├── fractal.py          # Korelasyon boyutu
-│   ├── acf.py              # Otokorelasyon
-│   ├── pacf.py             # Kismi otokorelasyon
-│   └── fft.py              # Fourier donusumu
-├── pipeline/               # Analiz pipeline motoru
-│   ├── node.py             # Node sinifi (bagimlilik takibi)
-│   └── engine.py           # Pipeline calistiricisi
-├── ui/                     # PySide6 kullanici arayuzu
-├── tests/                  # Validasyon testleri
-│   ├── test_validation.py         # 10 sistem bilimsel validasyon
-│   ├── test_wolf_matlab_match.py  # Wolf MATLAB uyumluluk testi
-│   └── test_preprocessing_workflow.py  # Preprocessing & UI testleri
-├── examples/               # Ornek scriptler
-├── documents/              # Wolf MATLAB referans dosyalari
-├── main.py                 # Uygulama giris noktasi
-├── ROADMAP.md              # Proje spesifikasyonu
-└── requirements.txt        # Bagimliliklar
+│   └── session.py          # Analysis session save/load
+├── analysis/               # Analysis algorithms
+│   ├── ami.py              # Average Mutual Information (tau estimation)
+│   ├── fnn.py              # False Nearest Neighbors (m estimation)
+│   ├── embedding.py        # Time-delay embedding
+│   ├── lyapunov.py         # Wolf + Rosenstein Lyapunov exponents
+│   ├── fractal.py          # Correlation dimension
+│   ├── acf.py              # Autocorrelation
+│   ├── pacf.py             # Partial autocorrelation
+│   └── fft.py              # Fourier transform
+├── pipeline/               # Analysis pipeline engine
+│   ├── node.py             # Node class (dependency tracking)
+│   └── engine.py           # Pipeline executor
+├── ui/                     # PySide6 user interface
+├── tests/                  # Validation tests
+│   ├── test_validation.py         # 10 system scientific validation
+│   ├── test_wolf_matlab_match.py  # Wolf MATLAB compatibility test
+│   └── test_preprocessing_workflow.py  # Preprocessing & UI tests
+├── examples/               # Example scripts
+├── documents/              # Wolf MATLAB reference files
+├── main.py                 # Application entry point
+├── CLAUDE.md               # Developer guidelines (Turkish)
+├── ROADMAP.md              # Project specification (Turkish)
+├── README.md               # This file (English)
+├── README(tr).md           # Turkish translation (git-ignored)
+└── requirements.txt        # Dependencies
 ```
 
-## UI Özellikleri
+## UI Features
 
-### Split Plot Panel (Yeni!)
-Sağ taraftaki grafik paneli artık iki bölümlü:
+### Split Plot Panel
+The right-side plot panel is now split into two sections:
 
-**Üst Panel (Aktif Grafik)**
-- Mevcut analiz sonucu otomatik olarak gösterilir
-- Auto-range: Grafik tam ekrana otomatik sığar
+**Top Panel (Active Plot)**
+- Displays current analysis result automatically
+- Auto-range: Plot automatically fits the viewport
 
-**Alt Panel (Karşılaştırma)**
-- Dropdown menüden geçmiş grafiklerden birini seç
-- Farklı analizleri yan yana karşılaştır
-- 20 grafik geçmişi saklanır
+**Bottom Panel (Comparison)**
+- Select a previous graph from dropdown menu
+- Compare different analyses side-by-side
+- 20 plot history retained
 
-**Kullanım Senaryoları:**
-- AMI sonucu ile Lyapunov eğrisini karşılaştır
-- Preprocessing öncesi/sonrası veriyi yan yana gör
-- Wolf vs Rosenstein algoritma sonuçlarını karşılaştır
-- ACF ile PACF'yi aynı anda incele
+**Use Cases:**
+- Compare AMI result with Lyapunov curve
+- View preprocessing before/after data side-by-side
+- Compare Wolf vs Rosenstein algorithm results
+- Examine ACF and PACF simultaneously
 
 ### Auto-Range
-Tüm grafikler otomatik olarak viewport'a sığar (PyQtGraph autoRange). Manuel zoom/pan yine kullanılabilir.
+All plots automatically fit to viewport (PyQtGraph autoRange). Manual zoom/pan still available.
 
-### Faz Uzayı Görselleştirme (Step 5)
-Zaman gecikmeli gömme ile oluşturulan faz uzayını görselleştirir:
+### Phase Space Visualization (Step 5)
+Visualizes phase space created by time-delay embedding:
 
-**2D Faz Uzayı:**
+**2D Phase Space:**
 - x(t) vs x(t+τ) trajectory plot
-- Başlangıç (kırmızı) ve bitiş (yeşil) noktaları
-- Atraktör yapısını 2D'de göster
+- Start (red) and end (green) points
+- Shows attractor structure in 2D
 
-**3D Faz Uzayı:**
-- x(t), x(t+τ), x(t+2τ) 
-- XY izdüşümü, Z renk kodlamalı (mavi→kırmızı)
-- Lorenz butterfly, Rössler spiral görselleştirmesi
+**3D Phase Space:**
+- x(t), x(t+τ), x(t+2τ)
+- XY projection, Z color-coded (blue→red)
+- Lorenz butterfly, Rössler spiral visualization
 
-**Geri Dönüş Haritası:**
+**Return Map:**
 - x(t) vs x(t+1) scatter plot
-- y=x diagonal referans çizgisi
-- Kaotik/periyodik yapı analizi
+- y=x diagonal reference line
+- Chaotic/periodic structure analysis
 
-τ ve m parametreleri Step 4'ten otomatik gelir, manuel override yapılabilir.
+τ and m parameters automatically come from Step 4, manual override available.
 
-## Export ve Session Yönetimi
+## Export and Session Management
 
-### Export Özellikleri
-- **CSV Export**: Zaman serisi verilerini metadata ile birlikte dışa aktar
-- **PNG Export**: Grafikleri yüksek çözünürlükte (1920x1080) kaydet
-- **JSON Export**: Tüm analiz sonuçlarını taşınabilir formatta dışa aktar
+### Export Features
+- **CSV Export**: Export time series data with metadata
+- **PNG Export**: Save plots at high resolution (1920x1080)
+- **JSON Export**: Export all analysis results in portable format
 
 ### Session Management
-- **Kaydet (.tsa)**: Binary pickle format — hızlı ve kompakt
-- **Kaydet (.json)**: Human-readable JSON — taşınabilir, metin tabanlı
-- **Session İçeriği**:
-  - Zaman serisi verisi (orijinal + işlenmiş)
-  - Parametreler (tau, m)
-  - Tüm analiz sonuçları (AMI, FNN, ACF, Lyapunov, vb.)
-  - Preprocessing geçmişi (hangi işlemler uygulandı)
-  - Metadata ve timestamp'ler
+- **Save (.tsa)**: Binary pickle format — fast and compact
+- **Save (.json)**: Human-readable JSON — portable, text-based
+- **Session Contents**:
+  - Time series data (original + processed)
+  - Parameters (tau, m)
+  - All analysis results (AMI, FNN, ACF, Lyapunov, etc.)
+  - Preprocessing history
+  - Metadata and timestamps
 
-### Kullanım
+### Usage
 ```python
-# Session oluştur ve kaydet
+# Create and save session
 from core.session import AnalysisSession
 
 session = AnalysisSession()
 session.set_timeseries(my_timeseries)
 session.set_parameters(tau=10, m=3)
-session.save_pickle("my_analysis.tsa")  # veya .json
+session.save_pickle("my_analysis.tsa")  # or .json
 
-# Session yükle
+# Load session
 loaded = AnalysisSession.load_pickle("my_analysis.tsa")
 print(loaded.tau, loaded.m)
 ```
 
-## Teknik Notlar
+## Custom ODE / Discrete Map Systems
 
-- **Parametre secimi veri tabanlıdır**: tau ve m degerleri AMI ve FNN ile otomatik hesaplanir; elle ayar yapilmaz.
-- **Wolf algoritmasi** orijinal MATLAB implementasyonuna (Alan Wolf, 1985) sadik kalir. Wolf dogasi geregi overestimate yapabilir — bu algoritmanin bilinen bir ozelliidir.
-- **Rosenstein auto-fit** tam egri R^2 >= 0.98 kontrolu + coklu pencere boyutlu rolling slope doyum tespiti kullanir.
-- **LE stabilite testi**: m+-1 ve tau+-10% varyasyonlari ile hesaplanan CV (varyasyon katsayisi) < 0.20 ise sonuc guvenilir kabul edilir. 8/10 sistemde stabil.
-- **KD-Tree** (scipy.spatial.cKDTree) komsu aramalarinda kullanilir (Wolf ve Rosenstein).
+The **Custom ODE/Map** panel lets you define your own dynamical system using symbolic expressions, without writing any code.
 
-## Validasyon ve Test Stratejisi
+### ODE Systems (Continuous)
 
-Bu proje iki seviyeli doğrulama yaklaşımı kullanır:
+Enter one equation per variable in the form `dx/dt = ...`. Supports up to 6 coupled equations.
 
-### 1. Bilimsel Doğrulama (test_validation.py)
-**Amaç:** Algoritmaların literatür referanslarına uygunluğunu test etmek.
+**Example — Lorenz System:**
+```
+dx/dt = s*(y-x)
+dy/dt = x*(r-z)-y
+dz/dt = x*y-b*z
+Parameters: s=10, r=28, b=8/3
+```
+
+**Example — Van der Pol Oscillator:**
+```
+dx/dt = y
+dy/dt = mu*(1-x**2)*y-x
+Parameters: mu=1.5
+```
+
+### Discrete Map Systems
+
+Enter one expression per variable separated by `;`.
+
+**Example — Logistic Map:**
+```
+x_(n+1) = r*x*(1-x)
+Parameters: r=3.9
+```
+
+**Example — Hénon Map:**
+```
+x_(n+1) = 1-a*x**2+y
+y_(n+1) = b*x
+Parameters: a=1.4, b=0.3
+```
+
+### Supported Math Functions
+
+`sin`, `cos`, `tan`, `exp`, `log`, `sqrt`, `abs`, `sinh`, `cosh`, `tanh`, `asin`, `acos`, `atan`, `pi`, `e`
+
+### Parameter Format
+
+Parameters are entered as comma-separated `name=value` pairs. The following value formats are all accepted:
+
+| Format | Example | Result |
+|--------|---------|--------|
+| Integer | `10` | 10.0 |
+| Decimal | `2.666` | 2.666 |
+| Fraction | `8/3` | 2.6666… |
+| Power | `2**3` | 8.0 |
+| Scientific notation | `1e-3` | 0.001 |
+| Negative | `-0.5` | -0.5 |
+
+**Valid parameter string examples:**
+```
+s=10, r=28, b=8/3
+alpha=1e-3, beta=2**4, gamma=-0.5
+mu=1.5
+```
+
+### Time Step (dt) Recommendations
+
+RK4 integration requires a sufficiently small `dt` to remain stable. If NaN values appear in the results, reduce `dt`:
+
+| System type | Recommended dt |
+|-------------|---------------|
+| Lorenz, Rössler, Chen | ≤ 0.05 (ideal: 0.01) |
+| Chua, Duffing | ≤ 0.01 |
+| Slow / linear systems | 0.05 – 0.1 |
+| Discrete maps | dt = 1 (fixed) |
+
+If the integration diverges, the application will show an error message specifying at which step NaN occurred, along with a recommendation to reduce `dt`.
+
+## Technical Notes
+
+- **Parameter selection is data-driven**: tau and m values are automatically computed via AMI and FNN; no manual defaults embedded.
+- **Wolf algorithm** faithfully follows original MATLAB implementation (Alan Wolf, 1985). Wolf tends to overestimate by design — a known characteristic of the algorithm.
+- **Rosenstein auto-fit** uses full curve R² >= 0.98 validation + multi-window rolling slope saturation detection.
+- **LE stability test**: Variations in m±1 and tau±10% yield CV (coefficient of variation) < 0.20 → result considered reliable. 8/10 systems are stable.
+- **KD-Tree** (scipy.spatial.cKDTree) used for neighbor searches in Wolf and Rosenstein algorithms.
+
+## Validation and Test Strategy
+
+This project uses a two-level validation approach:
+
+### 1. Scientific Validation (test_validation.py)
+**Purpose**: Test algorithm correctness against literature references.
 
 ```bash
 python tests/test_validation.py
 ```
 
-- **10 kaotik sistem** üzerinde Wolf, Rosenstein ve Kantz algoritmalarını test eder
-- **Literatür LE değerleri** ile karşılaştırır (örn: Lorenz 0.9056 nats/s)
-- **Veri-tabanlı parametre seçimi** kullanır (AMI + FNN ile tau ve m otomatik bulunur)
-- **Stabilite analizi** yapar (m±1, tau±10% varyasyonları ile CV<0.20 kontrolü)
-- **Sonuç:** 7/10 sistem <%10 hata, 10/10 sistem <%20 hata
+- Tests Wolf, Rosenstein, and Kantz algorithms on **10 chaotic systems**
+- Compares against **literature LE values** (e.g., Lorenz 0.9056 nats/s)
+- Uses **data-driven parameter selection** (AMI + FNN auto-finds tau and m)
+- Performs **stability analysis** (m±1, tau±10% variations with CV<0.20 check)
+- **Result**: 7/10 systems <10% error, 10/10 systems <20% error
 
-**Neden gerekli?** Algoritmaların bilimsel olarak doğru çalıştığını ve farklı dinamik sistemlerde güvenilir sonuçlar verdiğini gösterir.
+**Why needed?** Demonstrates algorithms work correctly and produce reliable results across different dynamical systems.
 
-### 2. MATLAB Uyumluluk Testleri (test_wolf_matlab_match.py)
-**Amaç:** Wolf'un orijinal MATLAB kodunun Python'a doğru çevrildiğini kanıtlamak.
+### 2. MATLAB Compatibility Tests (test_wolf_matlab_match.py)
+**Purpose**: Verify Wolf was correctly translated from original MATLAB code.
 
 ```bash
 python tests/test_wolf_matlab_match.py
 ```
 
 **Test #1: Lorenz (Data2.lor)**
-- Wolf'un kendi Data2.lor verisi (16384 nokta, σ=10, ρ=28, β=8/3)
-- **Birebir aynı parametreler:** `tau=10, m=3, dt=0.01, evolve=20, dismin=0.001, dismax=0.3, thmax=30°`
-- **Sonuç:** Python 2.01 bits/s | Wolf ~2.1 bits/s | **Fark: %4.1** ✅
+- Wolf's own data file (16384 points, σ=10, ρ=28, β=8/3)
+- **Identical parameters**: `tau=10, m=3, dt=0.01, evolve=20, dismin=0.001, dismax=0.3, thmax=30°`
+- **Result**: Python 2.01 bits/s | Wolf ~2.1 bits/s | **Difference: 4.1%** ✅
 
 **Test #2: Logistic Map**
-- 512 iterasyon, x(n+1) = 4x(n)(1-x(n))
-- **Birebir aynı parametreler:** `tau=1, m=2, evolve=3, dismin=0.0001, dismax=0.05`
-- **Sonuç:** Python 1.00 bits/iter | Wolf 0.98 | Theory 1.0 | **Fark: %2.2 (Wolf), %0.1 (Teori)** ✅
+- 512 iterations, x(n+1) = 4x(n)(1-x(n))
+- **Identical parameters**: `tau=1, m=2, evolve=3, dismin=0.0001, dismax=0.05`
+- **Result**: Python 1.00 bits/iter | Wolf 0.98 | Theory 1.0 | **Difference: 2.2% (Wolf), 0.1% (Theory)** ✅
 
-**Neden gerekli?** 
-- Wolf algoritması MATLAB'dan Python'a çevrildi — çevirinin doğruluğunu garantilemek gerekli
-- %2-4 fark kabul edilebilir: nearest neighbor search implementasyonu farklı (MATLAB box-grid vs Python KDTree)
-- Wolf dokümantasyonu "approximately" ifadesini kullanır
-- Test #2'de teorik değere %0.1 hata → algoritma matematiği doğru
+**Why needed?**
+- Wolf algorithm was translated from MATLAB → must verify correctness
+- 2-4% difference acceptable: different nearest-neighbor implementations (MATLAB grid vs Python KDTree)
+- Wolf documentation uses "approximately"
+- Test #2: 0.1% error vs theory → mathematics is correct
 
-**İki test arasındaki fark:**
-- `test_validation.py` → **Bilimsel doğruluk** (literatür ile karşılaştırma, veri-tabanlı parametre)
-- `test_wolf_matlab_match.py` → **Implementasyon doğruluğu** (MATLAB kodu ile karşılaştırma, sabit parametre)
+**Difference between tests:**
+- `test_validation.py` → **Scientific correctness** (literature comparison, data-driven parameters)
+- `test_wolf_matlab_match.py` → **Implementation correctness** (MATLAB comparison, fixed parameters)
 
-## Lisans
+## License
 
 MIT
+

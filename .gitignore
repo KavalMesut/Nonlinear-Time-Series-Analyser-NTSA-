@@ -17,6 +17,9 @@ venv/
 env/
 *.log
 test_output.txt
+tests/*.txt
+*_REPORT.md
+.claude/
 .idea/
 .vscode/
 *.swp
