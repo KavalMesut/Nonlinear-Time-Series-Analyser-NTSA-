@@ -25,3 +25,9 @@ tests/*.txt
 *.swp
 *.swo
 *~
+
+# Turkish translation (auto-generated from English README)
+README(tr).md
+
+# Documentation and reference files
+documents/
