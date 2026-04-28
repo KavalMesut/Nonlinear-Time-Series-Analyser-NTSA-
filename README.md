@@ -8,7 +8,7 @@ A desktop application for nonlinear analysis of chaotic time series. Provides da
 - **12 Preprocessing Functions**: Normalize, detrend, outlier removal, smooth, difference, resample, filter, log/boxcox transform, windowing, denoise
 - **Automatic Parameter Estimation**: AMI (time delay tau) and FNN (embedding dimension m) data-driven selection
 - **Phase Space Visualization**: 2D/3D phase space, return map, attractor structure
-- **Wolf Lyapunov Algorithm**: Faithful implementation of original MATLAB code (KD-Tree based neighbor search)
+- **Wolf Lyapunov Algorithm**: Faithful implementation of original MATLAB code (KD-Tree based neighbor search). Reference: [Wolf Lyapunov Exponent Estimation (MathWorks)](https://www.mathworks.com/matlabcentral/fileexchange/48084-wolf-lyapunov-exponent-estimation-from-a-time-series?s_tid=FX_rc2_behav)
 - **Rosenstein Lyapunov Algorithm**: Auto-fit largest Lyapunov exponent calculation with multiple window sizes
 - **Correlation Dimension**: Grassberger-Procaccia algorithm
 - **Linear Analysis**: ACF, PACF, FFT (Hann/Hamming/Blackman windows)
