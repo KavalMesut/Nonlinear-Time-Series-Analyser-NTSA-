@@ -28,7 +28,7 @@ class ResultsSummaryPanel(QWidget):
         layout.setSpacing(10)
         
         # Title - left aligned
-        title = QLabel("📊 Analiz Sonuçları Özeti")
+        title = QLabel(self.tm("results_title"))
         title.setStyleSheet("font-size: 16pt; font-weight: bold; color: #268bd2;")
         title.setAlignment(Qt.AlignLeft)
         layout.addWidget(title)
@@ -53,8 +53,8 @@ class ResultsSummaryPanel(QWidget):
         
         # 2. Preprocessing Card
         self.preproc_card = self._create_card("2. Ön İşleme", [
-            ("Trend Giderme:", "—"),
-            ("Normalizasyon:", "—"),
+            (self.tm("results_detrend"), "—"),
+            (self.tm("results_normalize"), "—"),
             ("Yumuşatma:", "—")
         ])
         self.cards_layout.addWidget(self.preproc_card, 0, 1)
@@ -94,10 +94,10 @@ class ResultsSummaryPanel(QWidget):
         layout.addLayout(self.cards_layout)
         
         # Interpretation section
-        interp_group = QGroupBox("Sistem Yorumu")
+        interp_group = QGroupBox(self.tm("results_interp"))
         interp_layout = QVBoxLayout()
         
-        self.interp_label = QLabel("Sistem yorumunu görmek için tüm analiz adımlarını tamamlayın.")
+        self.interp_label = QLabel(self.tm("results_interp_wait"))
         self.interp_label.setWordWrap(True)
         self.interp_label.setStyleSheet("font-size: 12pt; padding: 10px;")
         interp_layout.addWidget(self.interp_label)
@@ -165,8 +165,8 @@ class ResultsSummaryPanel(QWidget):
     
     def update_preprocessing(self, detrend, normalize, smoothing):
         """Update preprocessing card."""
-        self.preproc_card.field_labels["Trend Giderme:"].setText("Evet" if detrend else "Hayır")
-        self.preproc_card.field_labels["Normalizasyon:"].setText("Evet" if normalize else "Hayır")
+        self.preproc_card.field_labels[self.tm("results_detrend")].setText(self.tm("results_yes") if detrend else self.tm("results_no"))
+        self.preproc_card.field_labels[self.tm("results_normalize")].setText(self.tm("results_yes") if normalize else self.tm("results_no"))
         self.preproc_card.field_labels["Yumuşatma:"].setText(smoothing if smoothing else "Yok")
         
         self.results_data['preprocessing'] = {
@@ -238,7 +238,7 @@ class ResultsSummaryPanel(QWidget):
     def _update_interpretation(self):
         """Update system interpretation based on all results."""
         if 'chaos' not in self.results_data:
-            self.interp_label.setText("Sistem yorumunu görmek için kaos analizini tamamlayın.")
+            self.interp_label.setText(self.tm("results_interp_chaos"))
             return
         
         chaos = self.results_data.get('chaos', {})
@@ -246,7 +246,7 @@ class ResultsSummaryPanel(QWidget):
         corr_dim = chaos.get('corr_dim')
         
         if lyap is None:
-            self.interp_label.setText("Sistem yorumunu görmek için Lyapunov üstelini hesaplayın.")
+            self.interp_label.setText(self.tm("results_interp_lyap"))
             return
         
         # Interpretation logic
@@ -287,4 +287,4 @@ class ResultsSummaryPanel(QWidget):
             for label in card.field_labels.values():
                 label.setText("—")
         
-        self.interp_label.setText("Sistem yorumunu görmek için tüm analiz adımlarını tamamlayın.")
+        self.interp_label.setText(self.tm("results_interp_wait"))

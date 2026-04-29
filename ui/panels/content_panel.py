@@ -22,6 +22,8 @@ class ContentPanel(QWidget):
     """Orta panel — kontrol panelleri + veri tablosu"""
 
     plot_requested = Signal(dict)
+    step_changed = Signal(int)          # Adım değiştiğinde (PlotPanel sekme günceller)
+    steps_invalidated = Signal(list)    # Adımların grafikleri geçersiz olduğunda
 
     def __init__(self, translation_manager, theme_manager):
         super().__init__()
@@ -31,7 +33,11 @@ class ContentPanel(QWidget):
         
         # Her adim icin son cizilen plot verisini sakla
         self.last_plot_data = {}  # {step_index: plot_data}
-        
+
+        # Parametre tahmini adımı için ayrı ayrı sakla (çift tablo için)
+        self.param_tau_plot = None
+        self.param_m_plot = None
+
         self.init_ui()
 
     def init_ui(self):
@@ -128,37 +134,24 @@ class ContentPanel(QWidget):
 
     def _forward_plot(self, plot_data: dict):
         """Forward plot request and update data table"""
+        current_step = self.stacked_widget.currentIndex()
+
+        # Sığ kopya: orijinali değiştirmeden _step etiketi ekle
+        plot_data = dict(plot_data)
+        plot_data['_step'] = current_step
+
         self.plot_requested.emit(plot_data)
         self._update_table_from_plot(plot_data)
-        
-        # Hangi adimdan geldigini tespit et ve sakla
-        current_step = self.stacked_widget.currentIndex()
-        
-        # Step 3 (Parameter Estimation) icin ozel - iki plot sakla
-        if current_step == 3:
-            ptype = plot_data.get('type', '')
-            if ptype == 'param_tau':
-                # Tau plot'u - ilk tabloda goster ve sakla
-                if not hasattr(self, 'param_tau_plot'):
-                    self.param_tau_plot = {}
-                self.param_tau_plot = plot_data
-            elif ptype == 'param_m':
-                # M plot'u - ikinci tabloda goster ve sakla
-                if not hasattr(self, 'param_m_plot'):
-                    self.param_m_plot = {}
-                self.param_m_plot = plot_data
-                # İki plot da varsa cache'e kaydet
-                if hasattr(self, 'param_tau_plot') and self.param_tau_plot:
-                    self.last_plot_data[current_step] = {
-                        'dual': True,
-                        'plot1': self.param_tau_plot,
-                        'plot2': self.param_m_plot
-                    }
-                else:
-                    self.last_plot_data[current_step] = plot_data
-        else:
-            # Diger adimlar icin normal kaydet
-            self.last_plot_data[current_step] = plot_data
+
+        # Parametre tahmini: çift tablo için ayrı sakla
+        ptype = plot_data.get('type', '')
+        if ptype == 'param_tau':
+            self.param_tau_plot = plot_data
+        elif ptype == 'param_m':
+            self.param_m_plot = plot_data
+
+        # Her adım için en son plot'u sakla (adım geçişinde yeniden göstermek için)
+        self.last_plot_data[current_step] = plot_data
     
     def _update_table_from_plot(self, plot_data: dict):
         """Extract data from plot_data and display in table"""
@@ -314,10 +307,11 @@ class ContentPanel(QWidget):
             'type': 'timeseries',
             'time': timeseries.time,
             'data': timeseries.data,
-            'metadata': timeseries.metadata
+            'metadata': timeseries.metadata,
+            '_step': 0
         }
         self.plot_requested.emit(plot_data)
-        
+
         # Step 0 icin plot data'yi sakla
         self.last_plot_data[0] = plot_data
 
@@ -406,10 +400,11 @@ class ContentPanel(QWidget):
                 del self.last_plot_data[step]
         
         # Parameter estimation cache'lerini de temizle
-        if hasattr(self, 'param_tau_plot'):
-            self.param_tau_plot = None
-        if hasattr(self, 'param_m_plot'):
-            self.param_m_plot = None
+        self.param_tau_plot = None
+        self.param_m_plot = None
+
+        # PlotPanel'e bu adımların grafiklerinin geçersiz olduğunu bildir
+        self.steps_invalidated.emit([2, 3, 4, 5, 6])
         
         # Mark preprocessing as completed
         main_window = self.window()
@@ -430,7 +425,9 @@ class ContentPanel(QWidget):
         self.current_data = None
         self.data_table_1.clear_table()
         self.data_table_2.clear_table()
-        self.last_plot_data.clear()  # Tum kaydedilmis plot'lari sil
+        self.last_plot_data.clear()
+        self.param_tau_plot = None
+        self.param_m_plot = None
         self.stacked_widget.setCurrentIndex(0)  # Data Load paneline dön
         
         # Her paneli sıfırla
@@ -445,32 +442,36 @@ class ContentPanel(QWidget):
             self.chaos_panel.m = None
 
     def set_step(self, step_index):
-        """Adim degistiginde tabloyu guncelle"""
+        """Adim degistiginde tabloyu ve grafigi guncelle"""
         self.stacked_widget.setCurrentIndex(step_index)
-        
+        self.step_changed.emit(step_index)   # PlotPanel sekme çubuğunu günceller
+
         # Step 6 (Results) icin data table'i gizle ve max height'i kaldir
         if step_index == 6:
             self.table_splitter.setVisible(False)
-            self.stacked_widget.setMaximumHeight(16777215)  # Qt max value - no limit
+            self.stacked_widget.setMaximumHeight(16777215)
             return
         else:
             self.table_splitter.setVisible(True)
-            self.stacked_widget.setMaximumHeight(550)  # Restore limit for other panels
-        
-        # Eger bu adim icin daha once plot cizilmisse onu goster
+            self.stacked_widget.setMaximumHeight(550)
+
         if step_index in self.last_plot_data:
-            cached_data = self.last_plot_data[step_index]
-            
-            # Step 3 dual-table mode mu kontrol et
-            if isinstance(cached_data, dict) and cached_data.get('dual'):
+            cached = self.last_plot_data[step_index]
+
+            # Adım 3: AMI + FNN her ikisi de hesaplandıysa çift tablo göster
+            if step_index == 3 and self.param_tau_plot and self.param_m_plot:
                 self.data_table_2.setVisible(True)
-                self._update_table_from_plot(cached_data['plot1'])  # Tau
-                self._update_table_from_plot(cached_data['plot2'])  # M
+                self._update_table_from_plot(self.param_tau_plot)
+                self._update_table_from_plot(self.param_m_plot)
             else:
-                # Tek tablo mode
                 self.data_table_2.setVisible(False)
-                self._update_table_from_plot(cached_data)
-        # Yoksa ham veriyi goster
+                self._update_table_from_plot(cached)
+
+            # Plot paneline gönder (_step etiketi ekleyerek)
+            tagged = dict(cached)
+            tagged['_step'] = step_index
+            self.plot_requested.emit(tagged)
+
         elif self.current_data is not None:
             self.data_table_2.setVisible(False)
             self.data_table_1.set_data(self.current_data)

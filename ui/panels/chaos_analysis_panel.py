@@ -103,7 +103,7 @@ class ChaosAnalysisPanel(QWidget):
         layout = QVBoxLayout(content_widget)
         
         # Parameters
-        params_group = QGroupBox("Parameters")
+        params_group = QGroupBox(self.tm("chaos_params"))
         params_layout = QFormLayout()
         
         self.tau_label = QLabel("τ = ?")
@@ -129,14 +129,14 @@ class ChaosAnalysisPanel(QWidget):
         self.manual_m_spin.setButtonSymbols(QSpinBox.UpDownArrows)
         params_layout.addRow("Manuel m:", self.manual_m_spin)
         
-        self.use_manual_check = QPushButton("Manuel Parametreleri Kullan")
+        self.use_manual_check = QPushButton(self.tm("chaos_manual_params"))
         self.use_manual_check.setCheckable(True)
         self.use_manual_check.toggled.connect(self._toggle_manual)
         params_layout.addRow("", self.use_manual_check)
         
         self.algo_combo = QComboBox()
-        self.algo_combo.addItem("Wolf Algorithm", "wolf")
-        self.algo_combo.addItem("Rosenstein Algorithm", "rosenstein")
+        self.algo_combo.addItem(self.tm("chaos_wolf"), "wolf")
+        self.algo_combo.addItem(self.tm("chaos_rosenstein"), "rosenstein")
         params_layout.addRow("Algorithm:", self.algo_combo)
         
         params_group.setLayout(params_layout)
@@ -146,7 +146,7 @@ class ChaosAnalysisPanel(QWidget):
         lyap_group = QGroupBox(self.tm('analysis_lyapunov'))
         lyap_layout = QVBoxLayout()
         
-        self.calc_lyap_button = QPushButton(self.tm('btn_calculate') + ' Lyapunov')
+        self.calc_lyap_button = QPushButton(self.tm('btn_calculate') + ' ' + self.tm('analysis_lyapunov'))
         self.calc_lyap_button.clicked.connect(self.calculate_lyapunov)
         self.calc_lyap_button.setEnabled(False)
         lyap_layout.addWidget(self.calc_lyap_button)
@@ -164,10 +164,10 @@ class ChaosAnalysisPanel(QWidget):
         layout.addWidget(lyap_group)
         
         # Lyapunov Spectrum
-        spec_group = QGroupBox("Lyapunov Spectrum")
+        spec_group = QGroupBox(self.tm("chaos_spectrum_group"))
         spec_layout = QVBoxLayout()
         
-        self.calc_spec_button = QPushButton("Calculate Full Spectrum")
+        self.calc_spec_button = QPushButton(self.tm("chaos_calc_spectrum"))
         self.calc_spec_button.clicked.connect(self.calculate_spectrum)
         self.calc_spec_button.setEnabled(False)
         spec_layout.addWidget(self.calc_spec_button)
@@ -189,7 +189,7 @@ class ChaosAnalysisPanel(QWidget):
         corr_group = QGroupBox(self.tm('analysis_correlation_dim'))
         corr_layout = QVBoxLayout()
         
-        self.calc_corr_button = QPushButton(self.tm('btn_calculate') + ' Correlation Dim')
+        self.calc_corr_button = QPushButton(self.tm('btn_calculate') + ' ' + self.tm('analysis_correlation_dim'))
         self.calc_corr_button.clicked.connect(self.calculate_correlation_dim)
         self.calc_corr_button.setEnabled(False)
         corr_layout.addWidget(self.calc_corr_button)
@@ -410,5 +410,5 @@ class ChaosAnalysisPanel(QWidget):
         return tau, m
     
     def refresh_ui(self):
-        self.calc_lyap_button.setText(self.tm('btn_calculate') + ' Lyapunov')
-        self.calc_corr_button.setText(self.tm('btn_calculate') + ' Correlation Dim')
+        self.calc_lyap_button.setText(self.tm('btn_calculate') + ' ' + self.tm('analysis_lyapunov'))
+        self.calc_corr_button.setText(self.tm('btn_calculate') + ' ' + self.tm('analysis_correlation_dim'))

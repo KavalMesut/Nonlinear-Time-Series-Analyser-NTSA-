@@ -80,7 +80,7 @@ class ParameterEstimationPanel(QWidget):
         self.tau_max_lag_spin.setRange(10, 500)
         self.tau_max_lag_spin.setValue(100)
         self.tau_max_lag_spin.setButtonSymbols(QSpinBox.UpDownArrows)
-        tau_controls.addRow(QLabel("Max Lag:"), self.tau_max_lag_spin)
+        tau_controls.addRow(QLabel(self.tm("param_max_lag")), self.tau_max_lag_spin)
         tau_layout.addLayout(tau_controls)
         
         self.estimate_tau_button = QPushButton(self.tm('btn_calculate') + ' τ')
@@ -104,7 +104,7 @@ class ParameterEstimationPanel(QWidget):
         self.m_max_dim_spin.setRange(2, 20)
         self.m_max_dim_spin.setValue(10)
         self.m_max_dim_spin.setButtonSymbols(QSpinBox.UpDownArrows)
-        m_controls.addRow(QLabel("Max Dimension:"), self.m_max_dim_spin)
+        m_controls.addRow(QLabel(self.tm("param_max_dim")), self.m_max_dim_spin)
         m_layout.addLayout(m_controls)
         
         self.estimate_m_button = QPushButton(self.tm('btn_calculate') + ' m')

@@ -31,7 +31,7 @@ class EmbeddingPanel(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         
         # Başlık
-        title = QLabel("Faz Uzayı Görselleştirme")
+        title = QLabel(self.tm("embed_title"))
         title.setStyleSheet("font-size: 14pt; font-weight: bold;")
         layout.addWidget(title)
         
@@ -44,7 +44,7 @@ class EmbeddingPanel(QWidget):
         layout.addWidget(desc)
         
         # Parametreler grubu
-        param_group = QGroupBox("Parametreler")
+        param_group = QGroupBox(self.tm("embed_params"))
         param_layout = QFormLayout()
         
         self.tau_label = QLabel("τ = ?")
@@ -70,7 +70,7 @@ class EmbeddingPanel(QWidget):
         self.manual_m_spin.setButtonSymbols(QSpinBox.UpDownArrows)
         param_layout.addRow("Manuel m:", self.manual_m_spin)
         
-        self.use_manual_check = QPushButton("Manuel Parametreleri Kullan")
+        self.use_manual_check = QPushButton(self.tm("embed_manual"))
         self.use_manual_check.setCheckable(True)
         self.use_manual_check.toggled.connect(self._toggle_manual)
         param_layout.addRow("", self.use_manual_check)
@@ -79,26 +79,26 @@ class EmbeddingPanel(QWidget):
         layout.addWidget(param_group)
         
         # Görselleştirme seçenekleri
-        vis_group = QGroupBox("Görselleştirme")
+        vis_group = QGroupBox(self.tm("embed_visualization"))
         vis_layout = QVBoxLayout()
         
         # 2D Phase Space
-        btn_2d = QPushButton("2D Faz Uzayı (x(t) vs x(t+τ))")
+        btn_2d = QPushButton(self.tm("embed_2d"))
         btn_2d.clicked.connect(self._plot_2d_phase_space)
         vis_layout.addWidget(btn_2d)
         
         # 3D Phase Space
-        btn_3d = QPushButton("3D Faz Uzayı (m=3)")
+        btn_3d = QPushButton(self.tm("embed_3d"))
         btn_3d.clicked.connect(self._plot_3d_phase_space)
         vis_layout.addWidget(btn_3d)
         
         # Return Map
-        btn_return = QPushButton("Geri Dönüş Haritası (x(t) vs x(t+1))")
+        btn_return = QPushButton(self.tm("embed_return"))
         btn_return.clicked.connect(self._plot_return_map)
         vis_layout.addWidget(btn_return)
         
         # Multi-dimensional projection (opsiyonel)
-        btn_multi = QPushButton("Çok-Boyutlu İzdüşüm")
+        btn_multi = QPushButton(self.tm("embed_multi"))
         btn_multi.clicked.connect(self._plot_multi_dim)
         btn_multi.setEnabled(False)  # Gelecekte eklenecek
         vis_layout.addWidget(btn_multi)

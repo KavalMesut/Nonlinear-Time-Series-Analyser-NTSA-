@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(theme.get_stylesheet())
         self.theme_manager.set_theme(theme_name)
         self.theme_changed.emit(theme_name)
-        
+
         # Update panels with new theme
         if hasattr(self, 'content_panel'):
             self.content_panel.update_plot_theme()
@@ -222,18 +222,22 @@ class MainWindow(QMainWindow):
         """Set application language"""
         self.translation_manager.set_language(language)
         self.language_changed.emit(language)
-        
+
         # Refresh UI with new language
         self.refresh_ui()
     
     def refresh_ui(self):
         """Refresh UI elements with current language"""
         self.setWindowTitle(self.tr('window_title'))
-        
+
         # Recreate menu bar
         self.menuBar().clear()
         self.create_menu_bar()
-        
+
+        # Yeni oluşturulan menü öğeleri temayı hemen alsın
+        theme = self.theme_manager.get_theme()
+        self.setStyleSheet(theme.get_stylesheet())
+
         # Refresh panels
         if hasattr(self, 'steps_panel'):
             self.steps_panel.refresh_ui()

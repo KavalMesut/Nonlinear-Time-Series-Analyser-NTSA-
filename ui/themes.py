@@ -66,24 +66,29 @@ class DarkTheme(Theme):
             QMenuBar::item {{
                 background-color: transparent;
                 padding: 4px 12px;
+                color: {self.colors['foreground']};
             }}
-            
+
             QMenuBar::item:selected {{
                 background-color: {self.colors['accent']};
+                color: {self.colors['foreground']};
             }}
-            
+
             QMenu {{
                 background-color: {self.colors['background_secondary']};
                 color: {self.colors['foreground']};
                 border: 1px solid {self.colors['border']};
             }}
-            
+
             QMenu::item {{
                 padding: 6px 24px;
+                color: {self.colors['foreground']};
+                background-color: transparent;
             }}
-            
+
             QMenu::item:selected {{
                 background-color: {self.colors['accent']};
+                color: {self.colors['foreground']};
             }}
             
             QPushButton {{
@@ -276,18 +281,30 @@ class HighContrastTheme(Theme):
                 color: {self.colors['foreground']};
                 border-bottom: 2px solid {self.colors['border']};
             }}
-            
+
+            QMenuBar::item {{
+                background-color: transparent;
+                padding: 4px 12px;
+                color: {self.colors['foreground']};
+            }}
+
             QMenuBar::item:selected {{
                 background-color: {self.colors['accent']};
                 color: {self.colors['background']};
             }}
-            
+
             QMenu {{
                 background-color: {self.colors['background']};
                 color: {self.colors['foreground']};
                 border: 2px solid {self.colors['border']};
             }}
-            
+
+            QMenu::item {{
+                padding: 6px 24px;
+                color: {self.colors['foreground']};
+                background-color: transparent;
+            }}
+
             QMenu::item:selected {{
                 background-color: {self.colors['accent']};
                 color: {self.colors['background']};
@@ -384,18 +401,30 @@ class ScientificTheme(Theme):
                 color: {self.colors['foreground']};
                 border-bottom: 1px solid {self.colors['border']};
             }}
-            
+
+            QMenuBar::item {{
+                background-color: transparent;
+                padding: 4px 12px;
+                color: {self.colors['foreground']};
+            }}
+
             QMenuBar::item:selected {{
                 background-color: {self.colors['accent']};
                 color: {self.colors['background']};
             }}
-            
+
             QMenu {{
                 background-color: {self.colors['background_secondary']};
                 color: {self.colors['foreground']};
                 border: 1px solid {self.colors['accent']};
             }}
-            
+
+            QMenu::item {{
+                padding: 6px 24px;
+                color: {self.colors['foreground']};
+                background-color: transparent;
+            }}
+
             QMenu::item:selected {{
                 background-color: {self.colors['accent']};
                 color: {self.colors['background']};

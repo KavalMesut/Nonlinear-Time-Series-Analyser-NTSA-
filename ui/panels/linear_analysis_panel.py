@@ -69,21 +69,21 @@ class LinearAnalysisPanel(QWidget):
         self.analysis_combo.addItem(self.tm('analysis_pacf'), 'pacf')
         self.analysis_combo.addItem(self.tm('analysis_fft'), 'fft')
         self.analysis_combo.currentIndexChanged.connect(self.on_analysis_changed)
-        controls_layout.addRow(QLabel("Analysis:"), self.analysis_combo)
+        controls_layout.addRow(QLabel(self.tm("linear_analysis_lbl")), self.analysis_combo)
         
         self.max_lag_spin = QSpinBox()
         self.max_lag_spin.setRange(10, 1000)
         self.max_lag_spin.setValue(100)
         self.max_lag_spin.setButtonSymbols(QSpinBox.UpDownArrows)
-        controls_layout.addRow(QLabel("Max Lag:"), self.max_lag_spin)
+        controls_layout.addRow(QLabel(self.tm("linear_max_lag")), self.max_lag_spin)
         
         self.window_combo = QComboBox()
         self.window_combo.addItem("Hann", "hann")
         self.window_combo.addItem("Hamming", "hamming")
         self.window_combo.addItem("Blackman", "blackman")
-        self.window_combo.addItem("None", "none")
+        self.window_combo.addItem(self.tm("linear_window_none"), "none")
         self.window_combo.setVisible(False)
-        self.window_label = QLabel("Window:")
+        self.window_label = QLabel(self.tm("linear_window"))
         self.window_label.setVisible(False)
         controls_layout.addRow(self.window_label, self.window_combo)
         
@@ -104,6 +104,13 @@ class LinearAnalysisPanel(QWidget):
     def set_data(self, timeseries):
         self.current_data = timeseries
         self.calc_button.setEnabled(True)
+
+        # Maks. gecikmeyi veriye göre ayarla: n//4 (en az 10, en fazla n-1)
+        n = len(timeseries.data)
+        max_allowed = max(10, n - 1)
+        default_lag = max(10, n // 4)
+        self.max_lag_spin.setRange(5, max_allowed)
+        self.max_lag_spin.setValue(min(default_lag, max_allowed))
     
     def on_analysis_changed(self):
         analysis_type = self.analysis_combo.currentData()

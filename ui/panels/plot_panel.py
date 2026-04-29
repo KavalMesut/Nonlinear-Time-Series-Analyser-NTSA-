@@ -95,16 +95,24 @@ class CustomGLViewWidget(gl.GLViewWidget):
 class PlotPanel(QWidget):
     """Sag panel: ust/alt split grafik + gecmis sistemi"""
 
-    def __init__(self, theme_manager, plot_settings):
+    def __init__(self, theme_manager, plot_settings, translation_manager=None):
         super().__init__()
         self.theme_manager = theme_manager
         self.plot_settings = plot_settings
+        self.tm = translation_manager if translation_manager is not None else (lambda key: key)
         
         # Plot history (son 20 grafik sakla)
         self.plot_history: List[Dict] = []
         self.max_history = 20
-        
+
+        # Adım bazlı sekme sistemi
+        self._step_plots: Dict[int, List[Dict]] = {}   # {adım: [plot_data, ...]}
+        self._active_tab_per_step: Dict[int, int] = {} # {adım: aktif_sekme_idx}
+        self._current_tab_step: int = -1
+        self.top_tab_buttons: List = []
+
         self.init_ui()
+        self.refresh_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -118,9 +126,17 @@ class PlotPanel(QWidget):
         top_layout = QVBoxLayout(top_widget)
         top_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.top_title_label = QLabel("Grafik")
+        self.top_title_label = QLabel(self.tr("plot_title"))
         self.top_title_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
         top_layout.addWidget(self.top_title_label)
+
+        # Sekme satırı (birden fazla grafik olduğunda gösterilir)
+        self.top_tab_row = QWidget()
+        self.top_tab_layout = QHBoxLayout(self.top_tab_row)
+        self.top_tab_layout.setContentsMargins(0, 2, 0, 2)
+        self.top_tab_layout.setSpacing(4)
+        self.top_tab_row.setVisible(False)
+        top_layout.addWidget(self.top_tab_row)
 
         # Stack: 2D (PlotWidget) + 3D (GLViewWidget with overlay)
         self.top_stack = QStackedWidget()
@@ -159,20 +175,21 @@ class PlotPanel(QWidget):
         # Kontrol satiri: dropdown + clear button
         control_layout = QHBoxLayout()
         
-        control_layout.addWidget(QLabel("Karsilastirma Grafigi:"))
+        self.bottom_compare_label = QLabel(self.tr("plot_compare_label"))
+        control_layout.addWidget(self.bottom_compare_label)
         
         self.bottom_combo = QComboBox()
-        self.bottom_combo.addItem("(Bos)")
+        self.bottom_combo.addItem(self.tr("plot_empty"))
         self.bottom_combo.currentIndexChanged.connect(self._on_bottom_combo_changed)
         control_layout.addWidget(self.bottom_combo, 1)
         
-        self.clear_bottom_btn = QPushButton("Temizle")
+        self.clear_bottom_btn = QPushButton(self.tr("plot_clear"))
         self.clear_bottom_btn.clicked.connect(self._clear_bottom_plot)
         control_layout.addWidget(self.clear_bottom_btn)
         
         bottom_layout.addLayout(control_layout)
 
-        self.bottom_title_label = QLabel("(Bos)")
+        self.bottom_title_label = QLabel(self.tr("plot_empty"))
         self.bottom_title_label.setStyleSheet("font-size: 10pt; font-style: italic;")
         bottom_layout.addWidget(self.bottom_title_label)
 
@@ -221,6 +238,9 @@ class PlotPanel(QWidget):
         """)
 
         layout.addWidget(self.vsplitter)
+
+    def tr(self, key: str) -> str:
+        return self.tm(key)
     
     def _get_pen(self, color=None, width=None):
         """Get pen with current settings"""
@@ -324,6 +344,17 @@ class PlotPanel(QWidget):
 
     def clear_plot(self):
         """Tüm grafikleri temizle"""
+        # Adım sekme sistemini sıfırla
+        self._step_plots.clear()
+        self._active_tab_per_step.clear()
+        self._current_tab_step = -1
+        self.top_tab_buttons = []
+        self.top_tab_row.setVisible(False)
+        while self.top_tab_layout.count():
+            item = self.top_tab_layout.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+
         # 2D widget'lara gec ve temizle
         self.top_stack.setCurrentIndex(0)
         self.bottom_stack.setCurrentIndex(0)
@@ -333,9 +364,9 @@ class PlotPanel(QWidget):
         self.bottom_colorbar_label.hide()
         
         self.top_plot_widget.clear()
-        self.top_title_label.setText("Grafik")
+        self.top_title_label.setText(self.tr("plot_title"))
         self.bottom_plot_widget.clear()
-        self.bottom_title_label.setText("(Bos)")
+        self.bottom_title_label.setText(self.tr("plot_empty"))
         self.bottom_combo.setCurrentIndex(0)
 
     def handle_plot(self, plot_data: dict):
@@ -381,6 +412,12 @@ class PlotPanel(QWidget):
             # Auto-range (grafigi tam ekrana sigdir)
             self.top_plot_widget.autoRange()
 
+        # Adım sekme sistemini güncelle
+        step = plot_data.get('_step')
+        if step is not None:
+            self._current_tab_step = step
+            self._update_step_tabs(step, plot_data)
+
         # History'e ekle
         self._add_to_history(plot_data)
 
@@ -410,10 +447,10 @@ class PlotPanel(QWidget):
         ptype = plot_data.get('type', 'Unknown')
         
         if ptype == 'timeseries':
-            return "Time Series"
+            return self.tr("plot_time_series")
         elif ptype == 'linear':
             atype = plot_data.get('analysis_type', 'acf').upper()
-            return f"Linear: {atype}"
+            return f"{self.tr('plot_linear')}: {atype}"
         elif ptype == 'param_tau':
             return "AMI (τ estimation)"
         elif ptype == 'param_m':
@@ -422,12 +459,12 @@ class PlotPanel(QWidget):
             algo = plot_data.get('results', {}).get('algorithm', 'Unknown')
             return f"Lyapunov: {algo}"
         elif ptype == 'chaos_spectrum':
-            return "Lyapunov Spectrum"
+            return self.tr("plot_lyapunov_spectrum")
         elif ptype == 'chaos_correlation':
-            return "Correlation Dimension"
+            return self.tr("plot_correlation_dim")
         elif ptype == 'preprocessing':
             op = plot_data.get('operation', 'Unknown')
-            return f"Preprocessing: {op}"
+            return f"{self.tr('plot_preprocessing')}: {op}"
         elif ptype == 'embedding_2d':
             tau = plot_data.get('tau', '?')
             return f"2D Faz Uzayı (τ={tau})"
@@ -437,7 +474,7 @@ class PlotPanel(QWidget):
         elif ptype == 'return_map':
             return "Geri Dönüş Haritası"
         else:
-            return f"Plot ({ptype})"
+            return f"{self.tr('plot_title')} ({ptype})"
 
     def _update_bottom_combo(self):
         """Dropdown menu'yu history'den guncelle"""
@@ -447,7 +484,7 @@ class PlotPanel(QWidget):
         # Combobox'i temizle
         self.bottom_combo.blockSignals(True)
         self.bottom_combo.clear()
-        self.bottom_combo.addItem("(Bos)")
+        self.bottom_combo.addItem(self.tr("plot_empty"))
         
         # History'den ekle (ters sirada, en yeni ustte)
         for entry in reversed(self.plot_history):
@@ -462,7 +499,7 @@ class PlotPanel(QWidget):
 
     def _on_bottom_combo_changed(self, index: int):
         """Alt panel dropdown'da secim degistiginde"""
-        if index == 0:  # "(Bos)"
+        if index == 0:  # "(Boş)" / "(Empty)"
             self._clear_bottom_plot()
             return
         
@@ -496,7 +533,7 @@ class PlotPanel(QWidget):
         # Color bar'ı gizle
         self.bottom_colorbar_label.hide()
         self.bottom_plot_widget.clear()
-        self.bottom_title_label.setText("(Bos)")
+        self.bottom_title_label.setText(self.tr("plot_empty"))
         self.bottom_combo.blockSignals(True)
         self.bottom_combo.setCurrentIndex(0)
         self.bottom_combo.blockSignals(False)
@@ -533,12 +570,19 @@ class PlotPanel(QWidget):
     def _plot_timeseries(self, d, widget, title_label):
         widget.clear()
         widget.setLogMode(y=False)
-        widget.setLabel('left', 'Value')
-        widget.setLabel('bottom', 'Time')
-        title_label.setText("Time Series")
-        widget.plot(d['time'], d['data'],
-                    pen=self._get_pen(),
-                    name='Time Series')
+        widget.setLabel('bottom', self.tr('plot_time'))
+        # SI prefix'i kapat: "(x0.001)" gibi otomatik çarpan yazmasın
+        widget.getAxis('left').enableAutoSIPrefix(False)
+        widget.getAxis('bottom').enableAutoSIPrefix(False)
+
+        meta = d.get('metadata', {}) or {}
+        time = d['time']
+
+        var_name = meta.get('output_var_name', '')
+        y_label = f"{var_name}(t)" if var_name else self.tr('plot_value')
+        widget.setLabel('left', y_label)
+        title_label.setText(f"{self.tr('plot_time_series')} - {y_label}" if var_name else self.tr("plot_time_series"))
+        widget.plot(time, d['data'], pen=self._get_pen(), name=y_label)
 
     def _plot_linear(self, d, widget, title_label):
         widget.clear()
@@ -550,7 +594,7 @@ class PlotPanel(QWidget):
         if atype == 'acf':
             title_label.setText("ACF")
             widget.setLabel('left', 'ACF')
-            widget.setLabel('bottom', 'Lag')
+            widget.setLabel('bottom', self.tr('plot_lag'))
             widget.plot(results['lags'], results['acf'],
                         pen=self._get_pen())
             conf = 1.96 / np.sqrt(n)
@@ -561,13 +605,13 @@ class PlotPanel(QWidget):
         elif atype == 'pacf':
             title_label.setText("PACF")
             widget.setLabel('left', 'PACF')
-            widget.setLabel('bottom', 'Lag')
+            widget.setLabel('bottom', self.tr('plot_lag'))
             widget.plot(results['lags'], results['pacf'],
                         pen=self._get_pen())
         elif atype == 'fft':
-            title_label.setText("FFT Power Spectrum")
-            widget.setLabel('left', 'Power')
-            widget.setLabel('bottom', 'Frequency (Hz)')
+            title_label.setText(self.tr("plot_fft_power"))
+            widget.setLabel('left', self.tr('plot_power'))
+            widget.setLabel('bottom', self.tr('plot_frequency'))
             widget.plot(results['frequencies'], results['power'],
                         pen=self._get_pen())
             widget.setLogMode(y=True)
@@ -575,9 +619,9 @@ class PlotPanel(QWidget):
     def _plot_param_tau(self, d, widget, title_label):
         widget.clear()
         widget.setLogMode(y=False)
-        title_label.setText("AMI — Time Delay Estimation")
+        title_label.setText(self.tr("plot_ami_delay"))
         widget.setLabel('left', 'AMI')
-        widget.setLabel('bottom', 'Lag')
+        widget.setLabel('bottom', self.tr('plot_lag'))
         results = d['results']
         widget.plot(results['lags'], results['ami'],
                     pen=self._get_pen())
@@ -592,9 +636,9 @@ class PlotPanel(QWidget):
     def _plot_param_m(self, d, widget, title_label):
         widget.clear()
         widget.setLogMode(y=False)
-        title_label.setText("FNN — Embedding Dimension Estimation")
+        title_label.setText(self.tr("plot_fnn_dim"))
         widget.setLabel('left', 'FNN %')
-        widget.setLabel('bottom', 'Dimension')
+        widget.setLabel('bottom', self.tr('plot_dimension'))
         results = d['results']
         widget.plot(results['dimensions'], results['fnn'],
                     pen=self._get_pen())
@@ -607,11 +651,11 @@ class PlotPanel(QWidget):
         widget.setLogMode(y=False)
         results = d['results']
         algo = results.get('algorithm', '')
-        title_label.setText(f"Lyapunov — {algo}")
+        title_label.setText(f"{self.tr('plot_lyapunov')} - {algo}")
 
         if 't_steps' in results and 'divergence' in results:
             widget.setLabel('left', 'ln(divergence)')
-            widget.setLabel('bottom', 'Time')
+            widget.setLabel('bottom', self.tr('plot_time'))
             t = results['t_steps']
             div = results['divergence']
             valid = ~np.isnan(div)
@@ -629,9 +673,9 @@ class PlotPanel(QWidget):
     def _plot_chaos_spectrum(self, d, widget, title_label):
         widget.clear()
         widget.setLogMode(y=False)
-        title_label.setText("Lyapunov Spectrum")
+        title_label.setText(self.tr("plot_lyapunov_spectrum"))
         widget.setLabel('left', 'λ (nats/s)')
-        widget.setLabel('bottom', 'Exponent Index')
+        widget.setLabel('bottom', self.tr('plot_exponent_index'))
         exponents = d['exponents']
         x = np.arange(len(exponents))
         colors = []
@@ -650,7 +694,7 @@ class PlotPanel(QWidget):
     def _plot_chaos_correlation(self, d, widget, title_label):
         widget.clear()
         widget.setLogMode(y=False)
-        title_label.setText("Correlation Dimension")
+        title_label.setText(self.tr("plot_correlation_dim"))
         widget.setLabel('left', 'log(C(r))')
         widget.setLabel('bottom', 'log(r)')
         results = d['results']
@@ -668,19 +712,19 @@ class PlotPanel(QWidget):
     def _plot_preprocessing(self, d, widget, title_label):
         widget.clear()
         widget.setLogMode(y=False)
-        title_label.setText(f"Preprocessing — {d.get('operation', '')}")
-        widget.setLabel('left', 'Value')
-        widget.setLabel('bottom', 'Time')
+        title_label.setText(f"{self.tr('plot_preprocessing')} - {d.get('operation', '')}")
+        widget.setLabel('left', self.tr('plot_value'))
+        widget.setLabel('bottom', self.tr('plot_time'))
 
         # Orijinal veri (soluk)
         if d.get('data_original') is not None:
             widget.plot(d['time_original'], d['data_original'],
                         pen=pg.mkPen(color='#555555', width=1),
-                        name='Original')
+                        name=self.tr('plot_original'))
         # Islenmis veri
         widget.plot(d['time_processed'], d['data_processed'],
                     pen=self._get_pen(),
-                    name='Processed')
+                    name=self.tr('plot_processed'))
 
     def _plot_embedding_2d(self, d, widget, title_label):
         """2D Faz Uzayı: x(t) vs x(t+τ)"""
@@ -700,12 +744,12 @@ class PlotPanel(QWidget):
         # İlk nokta (başlangıç) kırmızı
         widget.plot([x[0]], [y[0]], 
                     pen=None, symbol='o', symbolSize=8, 
-                    symbolBrush='#dc322f', name='Start')
+                    symbolBrush='#dc322f', name=self.tr('plot_start'))
         
         # Son nokta (bitiş) yeşil
         widget.plot([x[-1]], [y[-1]], 
                     pen=None, symbol='s', symbolSize=8, 
-                    symbolBrush='#859900', name='End')
+                    symbolBrush='#859900', name=self.tr('plot_end'))
 
     def _plot_embedding_3d(self, d, widget, title_label):
         """3D Faz Uzayı: x(t), x(t+τ), x(t+2τ) - Gerçek 3D görselleştirme"""
@@ -837,12 +881,161 @@ class PlotPanel(QWidget):
         x_range = [x.min(), x.max()]
         widget.plot(x_range, x_range, 
                     pen=pg.mkPen('#dc322f', style=Qt.DashLine, width=1),
-                    name='y=x')
+                    name=self.tr('plot_diagonal'))
+
+    # ------------------------------------------------------------------
+    # ADIM SEKME SİSTEMİ (üst panel)
+    # ------------------------------------------------------------------
+
+    def _update_step_tabs(self, step: int, new_plot_data: dict):
+        """Bir adıma yeni plot ekler/günceller ve sekme çubuğunu yeniler."""
+        if step not in self._step_plots:
+            self._step_plots[step] = []
+
+        ptype = new_plot_data.get('type')
+        existing = self._step_plots[step]
+        found_idx = None
+        for i, p in enumerate(existing):
+            if p.get('type') == ptype:
+                existing[i] = new_plot_data
+                found_idx = i
+                break
+        if found_idx is None:
+            existing.append(new_plot_data)
+            found_idx = len(existing) - 1
+
+        # En son eklenen/güncellenen sekme aktif
+        self._active_tab_per_step[step] = found_idx
+
+        # Şu an bu adımdaysak sekme çubuğunu güncelle
+        if self._current_tab_step == step:
+            self._show_top_tabs_for_step(step)
+
+    def on_step_changed(self, step: int):
+        """ContentPanel adım değiştirdiğinde çağrılır — sekme çubuğunu günceller."""
+        self._current_tab_step = step
+        self._show_top_tabs_for_step(step)
+
+    def _show_top_tabs_for_step(self, step: int):
+        """Verilen adıma ait sekme butonlarını oluşturur/günceller."""
+        plots = self._step_plots.get(step, [])
+
+        # Mevcut butonları temizle
+        for btn in self.top_tab_buttons:
+            btn.setParent(None)
+        self.top_tab_buttons = []
+        while self.top_tab_layout.count():
+            item = self.top_tab_layout.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+
+        if len(plots) < 2:
+            self.top_tab_row.setVisible(False)
+            return
+
+        self.top_tab_row.setVisible(True)
+        active_idx = self._active_tab_per_step.get(step, 0)
+
+        for i, plot_data in enumerate(plots):
+            title = self._generate_title(plot_data)
+            btn = QPushButton(title)
+            btn.setCheckable(True)
+            btn.setChecked(i == active_idx)
+            self._style_tab_button(btn, i == active_idx)
+            btn.clicked.connect(
+                lambda checked, s=step, idx=i: self._on_top_tab_clicked(s, idx)
+            )
+            self.top_tab_layout.addWidget(btn)
+            self.top_tab_buttons.append(btn)
+
+        self.top_tab_layout.addStretch()
+
+    def _on_top_tab_clicked(self, step: int, idx: int):
+        """Kullanıcı bir sekmeye tıkladığında ilgili grafiği gösterir."""
+        self._active_tab_per_step[step] = idx
+
+        # Buton stillerini güncelle
+        for i, btn in enumerate(self.top_tab_buttons):
+            btn.setChecked(i == idx)
+            self._style_tab_button(btn, i == idx)
+
+        # Seçilen grafiği çiz
+        plots = self._step_plots.get(step, [])
+        if idx < len(plots):
+            plot_data = plots[idx]
+            ptype = plot_data.get('type', '')
+            if ptype == 'embedding_3d':
+                self.top_stack.setCurrentIndex(1)
+                self._plot_embedding_3d(plot_data, self.top_3d_widget, self.top_title_label)
+            else:
+                self.top_stack.setCurrentIndex(0)
+                self.top_colorbar_label.hide()
+                self._render_plot_to_widget(plot_data, self.top_plot_widget, self.top_title_label)
+                self.top_plot_widget.autoRange()
+
+    def _style_tab_button(self, btn: QPushButton, active: bool):
+        """Sekme butonuna aktif/pasif stilini uygular."""
+        if active:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #0e639c;
+                    color: #ffffff;
+                    border: 1px solid #4d8cc4;
+                    border-radius: 4px;
+                    padding: 3px 12px;
+                    font-size: 9pt;
+                    font-weight: bold;
+                }
+            """)
+        else:
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #2a2a2a;
+                    color: #909090;
+                    border: 1px solid #3f3f3f;
+                    border-radius: 4px;
+                    padding: 3px 12px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #333333;
+                    color: #c0c0c0;
+                    border: 1px solid #555555;
+                }
+            """)
+
+    def invalidate_steps(self, steps: list):
+        """Belirtilen adımların sekme verilerini siler (ör. ön işleme sonrası)."""
+        for step in steps:
+            self._step_plots.pop(step, None)
+            self._active_tab_per_step.pop(step, None)
+        if self._current_tab_step in steps:
+            self.top_tab_row.setVisible(False)
+            self.top_tab_buttons = []
 
     # ------------------------------------------------------------------
     def update_plot_theme(self):
         self._apply_theme(self.top_plot_widget)
         self._apply_theme(self.bottom_plot_widget)
+
+    def refresh_ui(self):
+        """Dil değiştiğinde görünür metinleri ve mevcut menüleri yenile."""
+        self.top_title_label.setText(self.tr("plot_title"))
+        self.bottom_compare_label.setText(self.tr("plot_compare_label"))
+        self.clear_bottom_btn.setText(self.tr("plot_clear"))
+
+        self.bottom_combo.blockSignals(True)
+        if self.bottom_combo.count() > 0:
+            self.bottom_combo.setItemText(0, self.tr("plot_empty"))
+        self.bottom_combo.blockSignals(False)
+
+        if self.bottom_title_label.text() in {"(Bos)", "(Boş)", "(Empty)"}:
+            self.bottom_title_label.setText(self.tr("plot_empty"))
+        if self.top_title_label.text() in {"Grafik", "Plot"}:
+            self.top_title_label.setText(self.tr("plot_title"))
+
+        if self._current_tab_step >= 0:
+            self._show_top_tabs_for_step(self._current_tab_step)
 
     def _apply_theme(self, pw: pg.PlotWidget):
         theme = self.theme_manager.get_theme()
