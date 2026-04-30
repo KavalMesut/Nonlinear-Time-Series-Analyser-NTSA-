@@ -35,10 +35,10 @@ class EmbeddingPanel(QWidget):
         title.setStyleSheet("font-size: 14pt; font-weight: bold;")
         layout.addWidget(title)
         
-        # Açıklama
+        # Description
         desc = QLabel(
-            "Zaman gecikmeli gömme ile oluşturulan faz uzayını görselleştirin.\n"
-            "τ ve m parametreleri Step 4'ten otomatik gelir."
+            "Visualize the phase space reconstructed via time-delay embedding.\n"
+            "τ and m parameters are carried over automatically from Step 3."
         )
         desc.setWordWrap(True)
         layout.addWidget(desc)
@@ -49,11 +49,11 @@ class EmbeddingPanel(QWidget):
         
         self.tau_label = QLabel("τ = ?")
         self.tau_label.setStyleSheet("font-weight: bold; color: #268bd2;")
-        param_layout.addRow("Gecikme Süresi (τ):", self.tau_label)
+        param_layout.addRow("Time Delay (τ):", self.tau_label)
         
         self.m_label = QLabel("m = ?")
         self.m_label.setStyleSheet("font-weight: bold; color: #268bd2;")
-        param_layout.addRow("Gömme Boyutu (m):", self.m_label)
+        param_layout.addRow("Embedding Dimension (m):", self.m_label)
         
         # Manuel override (opsiyonel)
         self.manual_tau_spin = QSpinBox()
@@ -61,14 +61,14 @@ class EmbeddingPanel(QWidget):
         self.manual_tau_spin.setValue(10)
         self.manual_tau_spin.setEnabled(False)
         self.manual_tau_spin.setButtonSymbols(QSpinBox.UpDownArrows)
-        param_layout.addRow("Manuel τ:", self.manual_tau_spin)
+        param_layout.addRow("Manual τ:", self.manual_tau_spin)
         
         self.manual_m_spin = QSpinBox()
         self.manual_m_spin.setRange(2, 10)
         self.manual_m_spin.setValue(3)
         self.manual_m_spin.setEnabled(False)
         self.manual_m_spin.setButtonSymbols(QSpinBox.UpDownArrows)
-        param_layout.addRow("Manuel m:", self.manual_m_spin)
+        param_layout.addRow("Manual m:", self.manual_m_spin)
         
         self.use_manual_check = QPushButton(self.tm("embed_manual"))
         self.use_manual_check.setCheckable(True)
@@ -108,8 +108,8 @@ class EmbeddingPanel(QWidget):
         
         # Bilgi
         info = QLabel(
-            "<b>Not:</b> 3D görselleştirme için OpenGL gereklidir. "
-            "Eğer 3D grafik göremiyorsanız PyOpenGL yükleyin: <code>pip install PyOpenGL</code>"
+            "<b>Note:</b> OpenGL is required for 3D visualization. "
+            "If 3D plots are not showing, install PyOpenGL: <code>pip install PyOpenGL</code>"
         )
         info.setWordWrap(True)
         info.setStyleSheet("color: #b58900; padding: 8px; background-color: rgba(181, 137, 0, 0.1);")
@@ -127,13 +127,13 @@ class EmbeddingPanel(QWidget):
             self.tau_label.setText(f"τ = {tau}")
             self.manual_tau_spin.setValue(tau)
         else:
-            self.tau_label.setText("τ = ? (Step 4'ten hesaplayın)")
+            self.tau_label.setText("τ = ? (compute from Step 3)")
         
         if m:
             self.m_label.setText(f"m = {m}")
             self.manual_m_spin.setValue(m)
         else:
-            self.m_label.setText("m = ? (Step 4'ten hesaplayın)")
+            self.m_label.setText("m = ? (compute from Step 3)")
     
     def _toggle_manual(self, checked):
         """Manuel parametre override toggle"""
@@ -170,7 +170,7 @@ class EmbeddingPanel(QWidget):
             'x': embedded[:, 0],
             'y': embedded[:, 1],
             'tau': tau,
-            'title': f'2D Faz Uzayı (τ={tau})'
+            'title': f'2D Phase Space (τ={tau})'
         }
         
         self.plot_requested.emit(plot_data)
@@ -207,7 +207,7 @@ class EmbeddingPanel(QWidget):
             'y': embedded[:, 1],
             'z': embedded[:, 2],
             'tau': tau,
-            'title': f'3D Faz Uzayı (τ={tau})'
+            'title': f'3D Phase Space (τ={tau})'
         }
         
         self.plot_requested.emit(plot_data)
@@ -233,7 +233,7 @@ class EmbeddingPanel(QWidget):
             'type': 'return_map',
             'x': x_t,
             'y': x_t1,
-            'title': 'Geri Dönüş Haritası (x(t) vs x(t+1))'
+            'title': 'Return Map (x(t) vs x(t+1))'
         }
         
         self.plot_requested.emit(plot_data)

@@ -341,6 +341,8 @@ class PlotPanel(QWidget):
                 self._plot_chaos_spectrum(plot_data, widget, title_label)
             elif ptype == 'chaos_correlation':
                 self._plot_chaos_correlation(plot_data, widget, title_label)
+            elif ptype == 'chaos_poincare':
+                self._plot_poincare(plot_data, widget, title_label)
 
     def clear_plot(self):
         """Tüm grafikleri temizle"""
@@ -402,6 +404,8 @@ class PlotPanel(QWidget):
                 self._plot_chaos_spectrum(plot_data, self.top_plot_widget, self.top_title_label)
             elif ptype == 'chaos_correlation':
                 self._plot_chaos_correlation(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'chaos_poincare':
+                self._plot_poincare(plot_data, self.top_plot_widget, self.top_title_label)
             elif ptype == 'preprocessing':
                 self._plot_preprocessing(plot_data, self.top_plot_widget, self.top_title_label)
             elif ptype == 'embedding_2d':
@@ -462,17 +466,19 @@ class PlotPanel(QWidget):
             return self.tr("plot_lyapunov_spectrum")
         elif ptype == 'chaos_correlation':
             return self.tr("plot_correlation_dim")
+        elif ptype == 'chaos_poincare':
+            return self.tr("plot_poincare")
         elif ptype == 'preprocessing':
             op = plot_data.get('operation', 'Unknown')
             return f"{self.tr('plot_preprocessing')}: {op}"
         elif ptype == 'embedding_2d':
             tau = plot_data.get('tau', '?')
-            return f"2D Faz Uzayı (τ={tau})"
+            return f"2D Phase Space (τ={tau})"
         elif ptype == 'embedding_3d':
             tau = plot_data.get('tau', '?')
-            return f"3D Faz Uzayı (τ={tau})"
+            return f"3D Phase Space (τ={tau})"
         elif ptype == 'return_map':
-            return "Geri Dönüş Haritası"
+            return "Return Map"
         else:
             return f"{self.tr('plot_title')} ({ptype})"
 
@@ -556,6 +562,8 @@ class PlotPanel(QWidget):
             self._plot_chaos_spectrum(plot_data, widget, title_label)
         elif ptype == 'chaos_correlation':
             self._plot_chaos_correlation(plot_data, widget, title_label)
+        elif ptype == 'chaos_poincare':
+            self._plot_poincare(plot_data, widget, title_label)
         elif ptype == 'preprocessing':
             self._plot_preprocessing(plot_data, widget, title_label)
         elif ptype == 'embedding_2d':
@@ -709,6 +717,48 @@ class PlotPanel(QWidget):
                         pen=self._get_pen(),
                         symbol='o', symbolSize=scatter_size)
 
+    def _plot_poincare(self, d, widget, title_label):
+        """Poincaré kesiti scatter grafiği."""
+        widget.clear()
+        widget.setLogMode(y=False)
+        plane = d.get('plane', {})
+        axis = plane.get('axis', 0)
+        value = plane.get('value', 0.0)
+        title_label.setText(f"{self.tr('plot_poincare')}  (eksen {axis} = {value:.4g})")
+
+        crossings = d.get('crossings', np.empty((0, 2)))
+        if len(crossings) == 0:
+            widget.setLabel('left', '')
+            widget.setLabel('bottom', '')
+            return
+
+        m = d.get('m', crossings.shape[1] if crossings.ndim == 2 else 2)
+
+        # Kesit ekseni dışında ilk iki ekseni göster
+        plot_axes = [i for i in range(crossings.shape[1]) if i != axis]
+        if len(plot_axes) < 2:
+            # m=1 veya kesit tüm boyutları tüketmişse: x vs index
+            x_data = np.arange(len(crossings))
+            y_data = crossings[:, 0]
+            widget.setLabel('left', f'x(t-{0}τ)')
+            widget.setLabel('bottom', 'Crossing index')
+        else:
+            ax0, ax1 = plot_axes[0], plot_axes[1]
+            x_data = crossings[:, ax0]
+            y_data = crossings[:, ax1]
+            widget.setLabel('left', f'x(t-{ax1}τ)')
+            widget.setLabel('bottom', f'x(t-{ax0}τ)')
+
+        scatter_size = self.plot_settings.get('scatter_size')
+        color = self.plot_settings.get('line_color')
+        widget.plot(
+            x_data, y_data,
+            pen=None, symbol='o',
+            symbolSize=max(2, scatter_size - 2),
+            symbolBrush=color,
+            symbolPen=None,
+        )
+
     def _plot_preprocessing(self, d, widget, title_label):
         widget.clear()
         widget.setLogMode(y=False)
@@ -731,7 +781,7 @@ class PlotPanel(QWidget):
         widget.clear()
         widget.setLogMode(y=False)
         tau = d.get('tau', '?')
-        title_label.setText(f"2D Faz Uzayı (τ={tau})")
+        title_label.setText(f"2D Phase Space (τ={tau})")
         widget.setLabel('left', f'x(t+{tau})')
         widget.setLabel('bottom', 'x(t)')
         
@@ -755,8 +805,8 @@ class PlotPanel(QWidget):
         """3D Faz Uzayı: x(t), x(t+τ), x(t+2τ) - Gerçek 3D görselleştirme"""
         tau = d.get('tau', '?')
         title_label.setText(
-            f"3D Faz Uzayı (τ={tau}) | "
-            f"Renk: Mavi (başlangıç) → Kırmızı (bitiş) = Zaman akışı"
+            f"3D Phase Space (τ={tau}) | "
+            f"Color: Blue (start) → Red (end) = time flow"
         )
         
         x = d['x']
@@ -861,7 +911,7 @@ class PlotPanel(QWidget):
         """Geri Dönüş Haritası: x(t) vs x(t+1)"""
         widget.clear()
         widget.setLogMode(y=False)
-        title_label.setText("Geri Dönüş Haritası")
+        title_label.setText("Return Map")
         widget.setLabel('left', 'x(t+1)')
         widget.setLabel('bottom', 'x(t)')
         
@@ -1081,8 +1131,8 @@ class PlotPanel(QWidget):
         
         # Metin etiketleri
         painter.setPen(Qt.white)
-        painter.drawText(5, 32, "t=0 (başlangıç)")
-        painter.drawText(120, 32, "t=son (bitiş)")
+        painter.drawText(5, 32, "t=0 (start)")
+        painter.drawText(120, 32, "t=end")
         
         painter.end()
         
@@ -1094,3 +1144,4 @@ class PlotPanel(QWidget):
         """)
         
         return label
+                                                             

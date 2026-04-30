@@ -37,7 +37,7 @@ def _safe_eval_number(expr_str: str) -> float:
         elif isinstance(node, ast.UnaryOp):
             return _ops[type(node.op)](_eval(node.operand))
         else:
-            raise ValueError(f"Desteklenmeyen ifade tipi: {ast.dump(node)}")
+            raise ValueError(f"Unsupported expression type: {ast.dump(node)}")
 
     tree = ast.parse(expr_str.strip(), mode='eval')
     return float(_eval(tree.body))
@@ -327,7 +327,7 @@ class DataLoadPanel(QWidget):
 
         self.n_points_input = QLineEdit()
         self.n_points_input.setText("5000")
-        self.n_points_input.setPlaceholderText("100 - 100000")
+        self.n_points_input.setPlaceholderText("100 - 1000000")
         test_form.addRow(self.tm('data_points') + ':', self.n_points_input)
 
         self.dt_gen_input = QLineEdit()
@@ -409,7 +409,7 @@ class DataLoadPanel(QWidget):
         for i in range(count):
             label = QLabel(f"d{var_names[i]}/dt =")
             input_field = QLineEdit()
-            input_field.setPlaceholderText(f"örn: sigma*({var_names[(i+1)%count]}-{var_names[i]})")
+            input_field.setPlaceholderText(f"e.g.: sigma*({var_names[(i+1)%count]}-{var_names[i]})")
             input_field.setMinimumHeight(30)
             row_layout = QHBoxLayout()
             row_layout.setContentsMargins(0, 0, 0, 0)
@@ -438,10 +438,10 @@ class DataLoadPanel(QWidget):
             label = QLabel(f"{var_names[i]}_(n+1) =")
             input_field = QLineEdit()
             if count == 1:
-                input_field.setPlaceholderText("örn: 4*x*(1-x)")
+                input_field.setPlaceholderText("e.g.: 4*x*(1-x)")
             else:
                 input_field.setPlaceholderText(
-                    f"örn: 1-a*{var_names[i]}**2+{var_names[(i+1)%count]}")
+                    f"e.g.: 1-a*{var_names[i]}**2+{var_names[(i+1)%count]}")
             input_field.setMinimumHeight(30)
             row_layout = QHBoxLayout()
             row_layout.setContentsMargins(0, 0, 0, 0)
@@ -520,7 +520,7 @@ class DataLoadPanel(QWidget):
                 system_type = self.system_combo.currentData()
                 try:
                     n_points = int(self.n_points_input.text())
-                    if n_points < 100 or n_points > 100000:
+                    if n_points < 100 or n_points > 1000000:
                         raise ValueError()
                 except ValueError:
                     n_points = 5000
@@ -570,9 +570,9 @@ class DataLoadPanel(QWidget):
                             except Exception:
                                 from PySide6.QtWidgets import QMessageBox
                                 QMessageBox.critical(
-                                    self, "Parametre Hatası",
-                                    f"'{key.strip()}' parametresinin değeri okunamadı: {val.strip()}\n"
-                                    "Geçerli formatlar: 10, 2.666, 8/3, 2**3, 1e-3"
+                                    self, "Parameter Error",
+                                    f"Could not parse value for parameter '{key.strip()}': {val.strip()}\n"
+                                    "Valid formats: 10, 2.666, 8/3, 2**3, 1e-3"
                                 )
                                 return
 
@@ -591,8 +591,8 @@ class DataLoadPanel(QWidget):
                             expr_text = field.text().strip()
                             if not expr_text:
                                 from PySide6.QtWidgets import QMessageBox
-                                QMessageBox.warning(self, "Eksik Denklem",
-                                                    f"{i+1}. denklem boş bırakılamaz.")
+                                QMessageBox.warning(self, "Missing Equation",
+                                                    f"Equation {i+1} cannot be empty.")
                                 return
                             expressions[f"d{var_names[i]}/dt"] = expr_text
 
@@ -603,11 +603,11 @@ class DataLoadPanel(QWidget):
                         if missing:
                             from PySide6.QtWidgets import QMessageBox
                             reply = QMessageBox.warning(
-                                self, "Eksik Parametreler",
-                                "Denklemde kullanılan ama girilmeyen parametreler:\n\n"
+                                self, "Missing Parameters",
+                                "Parameters used in equations but not provided:\n\n"
                                 f"  {', '.join(missing)}\n\n"
-                                "Bunlar 0 olarak kullanılacak, sonuçlar yanlış olabilir.\n"
-                                "Yine de devam etmek istiyor musunuz?",
+                                "They will be treated as 0, results may be incorrect.\n"
+                                "Do you want to continue anyway?",
                                 QMessageBox.Yes | QMessageBox.No,
                                 QMessageBox.No
                             )
@@ -631,7 +631,7 @@ class DataLoadPanel(QWidget):
                         # Discrete Map
                         if not self.map_equations_inputs:
                             from PySide6.QtWidgets import QMessageBox
-                            QMessageBox.warning(self, "Hata", "Harita denklemi tanımlanmamış.")
+                            QMessageBox.warning(self, "Error", "No map equation defined.")
                             return
 
                         all_map_var_names = ['x', 'y', 'z']
@@ -640,8 +640,8 @@ class DataLoadPanel(QWidget):
                             expr_text = field.text().strip()
                             if not expr_text:
                                 from PySide6.QtWidgets import QMessageBox
-                                QMessageBox.warning(self, "Eksik Denklem",
-                                                    f"{i+1}. harita denklemi boş bırakılamaz.")
+                                QMessageBox.warning(self, "Missing Equation",
+                                                    f"Map equation {i+1} cannot be empty.")
                                 return
                             expressions.append(expr_text)
 
@@ -654,11 +654,11 @@ class DataLoadPanel(QWidget):
                         if missing_map:
                             from PySide6.QtWidgets import QMessageBox
                             reply = QMessageBox.warning(
-                                self, "Eksik Parametreler",
-                                "Haritada kullanılan ama girilmeyen parametreler:\n\n"
+                                self, "Missing Parameters",
+                                "Parameters used in map but not provided:\n\n"
                                 f"  {', '.join(missing_map)}\n\n"
-                                "Bunlar 0 olarak kullanılacak, sonuçlar yanlış olabilir.\n"
-                                "Yine de devam etmek istiyor musunuz?",
+                                "They will be treated as 0, results may be incorrect.\n"
+                                "Do you want to continue anyway?",
                                 QMessageBox.Yes | QMessageBox.No,
                                 QMessageBox.No
                             )
@@ -674,8 +674,8 @@ class DataLoadPanel(QWidget):
                 except Exception as e:
                     import traceback
                     from PySide6.QtWidgets import QMessageBox
-                    QMessageBox.critical(self, "Sistem Hatası",
-                                         f"Hata: {str(e)}\n\n{traceback.format_exc()}")
+                    QMessageBox.critical(self, "System Error",
+                                         f"Error: {str(e)}\n\n{traceback.format_exc()}")
 
         except Exception:
             pass
@@ -717,4 +717,4 @@ class DataLoadPanel(QWidget):
             self.tm('data_load_file') + '\n\n'
             + '📁 ' + self.tm('data_browse') + '\n'
             + '🔽 ' + self.tm('data_drag_drop')
-        )
+        

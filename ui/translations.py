@@ -133,6 +133,15 @@ class Translations:
         'chaos_calc_spectrum':    {'tr': 'Tam Spektrumu Hesapla',       'en': 'Calculate Full Spectrum'},
         'chaos_calc_corr':        {'tr': 'Korelasyon Boyutu Hesapla',   'en': 'Calculate Correlation Dim'},
         'chaos_calc_lyap':        {'tr': 'Lyapunov Hesapla',            'en': 'Calculate Lyapunov'},
+        'chaos_poincare_group':   {'tr': 'Poincaré Kesiti',             'en': 'Poincaré Section'},
+        'chaos_poincare_axis':    {'tr': 'Kesit Ekseni:',               'en': 'Section Axis:'},
+        'chaos_poincare_value':   {'tr': 'Kesit Değeri:',               'en': 'Section Value:'},
+        'chaos_poincare_dir':     {'tr': 'Geçiş Yönü:',                'en': 'Crossing Direction:'},
+        'chaos_poincare_dir_up':  {'tr': 'Yukarı (+)',                  'en': 'Upward (+)'},
+        'chaos_poincare_dir_down':{'tr': 'Aşağı (−)',                   'en': 'Downward (−)'},
+        'chaos_poincare_dir_both':{'tr': 'Her İkisi',                   'en': 'Both'},
+        'chaos_calc_poincare':    {'tr': 'Poincaré Kesitini Hesapla',   'en': 'Calculate Poincaré Section'},
+        'plot_poincare':          {'tr': 'Poincaré Kesiti',             'en': 'Poincaré Section'},
 
         # Embedding panel
         'embed_title':         {'tr': 'Faz Uzayı Görselleştirme',  'en': 'Phase Space Visualization'},

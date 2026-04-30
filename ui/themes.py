@@ -161,13 +161,43 @@ class DarkTheme(Theme):
                 border: 1px solid {self.colors['border']};
                 outline: none;
             }}
-            
+
             QListWidget::item:selected, QTreeWidget::item:selected {{
                 background-color: {self.colors['selection']};
             }}
-            
+
             QListWidget::item:hover, QTreeWidget::item:hover {{
                 background-color: {self.colors['background_secondary']};
+            }}
+
+            QTableWidget, QTableView {{
+                background-color: {self.colors['background_tertiary']};
+                alternate-background-color: {self.colors['background_secondary']};
+                color: {self.colors['foreground']};
+                border: 1px solid {self.colors['border']};
+                gridline-color: {self.colors['border']};
+                outline: none;
+            }}
+
+            QTableWidget::item, QTableView::item {{
+                padding: 2px 4px;
+            }}
+
+            QTableWidget::item:selected, QTableView::item:selected {{
+                background-color: #4a4a4a;
+                color: {self.colors['foreground']};
+            }}
+
+            QHeaderView::section {{
+                background-color: {self.colors['background_secondary']};
+                color: {self.colors['foreground']};
+                border: 1px solid {self.colors['border']};
+                padding: 4px 6px;
+                font-weight: bold;
+            }}
+
+            QHeaderView::section:horizontal:hover {{
+                background-color: {self.colors['background_tertiary']};
             }}
             
             QScrollBar:vertical {{
@@ -347,10 +377,36 @@ class HighContrastTheme(Theme):
                 color: {self.colors['foreground']};
                 border: 2px solid {self.colors['border']};
             }}
-            
+
             QListWidget::item:selected, QTreeWidget::item:selected {{
                 background-color: {self.colors['selection']};
                 color: {self.colors['foreground']};
+            }}
+
+            QTableWidget, QTableView {{
+                background-color: {self.colors['background_secondary']};
+                alternate-background-color: {self.colors['background_tertiary']};
+                color: {self.colors['foreground']};
+                border: 2px solid {self.colors['border']};
+                gridline-color: {self.colors['border']};
+                outline: none;
+            }}
+
+            QTableWidget::item, QTableView::item {{
+                padding: 2px 4px;
+            }}
+
+            QTableWidget::item:selected, QTableView::item:selected {{
+                background-color: #555555;
+                color: {self.colors['foreground']};
+            }}
+
+            QHeaderView::section {{
+                background-color: {self.colors['background_tertiary']};
+                color: {self.colors['foreground']};
+                border: 2px solid {self.colors['border']};
+                padding: 4px 6px;
+                font-weight: bold;
             }}
             
             QScrollBar::handle:vertical, QScrollBar::handle:horizontal {{
@@ -486,10 +542,41 @@ class ScientificTheme(Theme):
                 border: 1px solid {self.colors['border']};
                 alternate-background-color: {self.colors['background']};
             }}
-            
+
             QListWidget::item:selected, QTreeWidget::item:selected {{
                 background-color: {self.colors['selection']};
                 color: {self.colors['foreground']};
+            }}
+
+            QTableWidget, QTableView {{
+                background-color: {self.colors['background_secondary']};
+                alternate-background-color: {self.colors['background']};
+                color: {self.colors['foreground']};
+                border: 1px solid {self.colors['border']};
+                gridline-color: {self.colors['border']};
+                outline: none;
+            }}
+
+            QTableWidget::item, QTableView::item {{
+                padding: 2px 4px;
+            }}
+
+            QTableWidget::item:selected, QTableView::item:selected {{
+                background-color: #3a4f52;
+                color: {self.colors['foreground']};
+            }}
+
+            QHeaderView::section {{
+                background-color: {self.colors['background_tertiary']};
+                color: {self.colors['foreground']};
+                border: 1px solid {self.colors['border']};
+                padding: 4px 6px;
+                font-weight: bold;
+            }}
+
+            QHeaderView::section:horizontal:hover {{
+                background-color: {self.colors['accent']};
+                color: {self.colors['background']};
             }}
             
             QScrollBar:vertical {{

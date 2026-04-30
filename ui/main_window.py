@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QMenuBar, QMenu, QStatusBar, QSplitter, QMessageBox, QFileDialog
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QSettings
 from PySide6.QtGui import QAction
 from pathlib import Path
 
@@ -30,9 +30,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
+        # Kalıcı uygulama ayarları (Windows registry / ~/.config)
+        self._settings = QSettings("TSAnalyzer", "TSAnalyzer")
+
         # Managers
         self.theme_manager = ThemeManager()
-        self.translation_manager = TranslationManager(default_language='tr')
+        saved_lang = self._settings.value("language", "tr")
+        self.translation_manager = TranslationManager(default_language=saved_lang)
         self.plot_settings = PlotSettings()
         
         # Session
@@ -219,7 +223,8 @@ class MainWindow(QMainWindow):
             self.plot_panel.update_plot_theme()
     
     def set_language(self, language: str):
-        """Set application language"""
+        """Set application language and persist the choice."""
+        self._settings.setValue("language", language)
         self.translation_manager.set_language(language)
         self.language_changed.emit(language)
 
@@ -254,23 +259,23 @@ class MainWindow(QMainWindow):
         reply = QMessageBox.question(
             self,
             self.tr('menu_file_new'),
-            "Mevcut analiz sıfırlanacak. Devam edilsin mi?",
+            "Current analysis will be reset. Do you want to continue?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
-        
+
         if reply == QMessageBox.Yes:
             self.current_session = AnalysisSession()
             self.current_file_path = None
             self.content_panel.reset_all()
             self.plot_panel.clear_plot()
-            self.status_bar.showMessage("Yeni analiz başlatıldı")
+            self.status_bar.showMessage("New analysis started")
     
     def open_file(self):
         """Session dosyası aç (.tsa veya .json)"""
         filepath, _ = QFileDialog.getOpenFileName(
             self,
-            "Analiz Dosyası Aç",
+            "Open Analysis File",
             str(Path.home()),
             "TSA Files (*.tsa);;JSON Files (*.json);;All Files (*.*)"
         )
@@ -286,9 +291,9 @@ class MainWindow(QMainWindow):
                 self.current_session = session
                 self.current_file_path = filepath
                 self._restore_session(session)
-                self.status_bar.showMessage(f"Yüklendi: {Path(filepath).name}")
+                self.status_bar.showMessage(f"Loaded: {Path(filepath).name}")
             else:
-                QMessageBox.warning(self, "Hata", "Dosya yüklenemedi!")
+                QMessageBox.warning(self, "Error", "Failed to load file!")
     
     def save_analysis(self):
         """Mevcut session'ı kaydet"""
@@ -303,7 +308,7 @@ class MainWindow(QMainWindow):
         """Session'ı yeni dosyaya kaydet"""
         filepath, _ = QFileDialog.getSaveFileName(
             self,
-            "Analizi Kaydet",
+            "Save Analysis",
             str(Path.home() / "analysis.tsa"),
             "TSA Files (*.tsa);;JSON Files (*.json);;All Files (*.*)"
         )
@@ -324,9 +329,9 @@ class MainWindow(QMainWindow):
         
         if success:
             self.current_file_path = filepath
-            self.status_bar.showMessage(f"Kaydedildi: {Path(filepath).name}")
+            self.status_bar.showMessage(f"Saved: {Path(filepath).name}")
         else:
-            QMessageBox.warning(self, "Hata", "Dosya kaydedilemedi!")
+            QMessageBox.warning(self, "Error", "Failed to save file!")
     
     def _update_session_from_ui(self):
         """UI'dan session'a mevcut durumu aktar"""
@@ -363,12 +368,12 @@ class MainWindow(QMainWindow):
     def export_csv(self):
         """Mevcut zaman serisini CSV olarak dışa aktar"""
         if not self.content_panel.current_data:
-            QMessageBox.warning(self, "Uyarı", "Dışa aktarılacak veri yok!")
+            QMessageBox.warning(self, "Warning", "No data to export!")
             return
-        
+
         filepath, _ = QFileDialog.getSaveFileName(
             self,
-            "CSV Olarak Dışa Aktar",
+            "Export as CSV",
             str(Path.home() / "timeseries.csv"),
             "CSV Files (*.csv);;All Files (*.*)"
         )
@@ -380,19 +385,19 @@ class MainWindow(QMainWindow):
                 include_metadata=True
             )
             if success:
-                self.status_bar.showMessage(f"CSV dışa aktarıldı: {Path(filepath).name}")
+                self.status_bar.showMessage(f"CSV exported: {Path(filepath).name}")
             else:
-                QMessageBox.warning(self, "Hata", "CSV dışa aktarılamadı!")
+                QMessageBox.warning(self, "Error", "Failed to export CSV!")
     
     def export_png(self):
         """Mevcut grafiği PNG olarak dışa aktar"""
         if not self.plot_panel.plot_widget:
-            QMessageBox.warning(self, "Uyarı", "Dışa aktarılacak grafik yok!")
+            QMessageBox.warning(self, "Warning", "No plot to export!")
             return
-        
+
         filepath, _ = QFileDialog.getSaveFileName(
             self,
-            "PNG Olarak Dışa Aktar",
+            "Export as PNG",
             str(Path.home() / "plot.png"),
             "PNG Files (*.png);;All Files (*.*)"
         )
@@ -405,9 +410,9 @@ class MainWindow(QMainWindow):
                 height=1080
             )
             if success:
-                self.status_bar.showMessage(f"PNG dışa aktarıldı: {Path(filepath).name}")
+                self.status_bar.showMessage(f"PNG exported: {Path(filepath).name}")
             else:
-                QMessageBox.warning(self, "Hata", "PNG dışa aktarılamadı!")
+                QMessageBox.warning(self, "Error", "Failed to export PNG!")
     
     def export_json(self):
         """Analiz sonuçlarını JSON olarak dışa aktar"""
@@ -416,7 +421,7 @@ class MainWindow(QMainWindow):
         
         filepath, _ = QFileDialog.getSaveFileName(
             self,
-            "JSON Olarak Dışa Aktar",
+            "Export as JSON",
             str(Path.home() / "analysis_results.json"),
             "JSON Files (*.json);;All Files (*.*)"
         )
@@ -427,9 +432,9 @@ class MainWindow(QMainWindow):
                 filepath
             )
             if success:
-                self.status_bar.showMessage(f"JSON dışa aktarıldı: {Path(filepath).name}")
+                self.status_bar.showMessage(f"JSON exported: {Path(filepath).name}")
             else:
-                QMessageBox.warning(self, "Hata", "JSON dışa aktarılamadı!")
+                QMessageBox.warning(self, "Error", "Failed to export JSON!")
     
     def show_preferences(self):
         """Show preferences dialog"""
@@ -471,8 +476,4 @@ class MainWindow(QMainWindow):
             self.tr('about_title'),
             self.tr('about_text')
         )
-    
-    def show_documentation(self):
-        """Show documentation"""
-        # TODO: Implement
-        self.status_bar.showMessage(self.tr('menu_help_documentation'))
+   

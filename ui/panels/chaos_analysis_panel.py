@@ -16,8 +16,9 @@ class ChaosWorker(QThread):
     finished = Signal(dict)
     error = Signal(str)
     progress = Signal(str)
-    
-    def __init__(self, data, tau, m, analysis_type, algorithm='wolf', dt=1.0):
+
+    def __init__(self, data, tau, m, analysis_type, algorithm='wolf', dt=1.0,
+                 poincare_plane=None, poincare_direction=1):
         super().__init__()
         self.data = data
         self.tau = tau
@@ -25,17 +26,19 @@ class ChaosWorker(QThread):
         self.analysis_type = analysis_type
         self.algorithm = algorithm
         self.dt = dt
-    
+        self.poincare_plane = poincare_plane
+        self.poincare_direction = poincare_direction
+
     def run(self):
         try:
             from analysis import (
                 lyapunov_wolf, lyapunov_rosenstein,
                 estimate_lyapunov_from_curve, correlation_dimension,
-                lyapunov_spectrum
+                lyapunov_spectrum, poincare_section,
             )
-            
+
             results = {}
-            
+
             if self.analysis_type == 'lyapunov':
                 if self.algorithm == 'wolf':
                     self.progress.emit("Calculating Lyapunov exponent (Wolf algorithm)...")
@@ -51,12 +54,12 @@ class ChaosWorker(QThread):
                     results['t_steps'] = t_steps
                     results['divergence'] = divergence
                     results['algorithm'] = 'Rosenstein'
-            
+
             elif self.analysis_type == 'spectrum':
-                self.progress.emit("Calculating full Lyapunov spectrum (Benettin)...")
+                self.progress.emit("Calculating full Lyapunov spectrum (Sano-Sawada/QR)...")
                 spec = lyapunov_spectrum(self.data, m=self.m, tau=self.tau, dt=self.dt)
                 results['spectrum'] = spec
-            
+
             elif self.analysis_type == 'correlation_dim':
                 self.progress.emit("Calculating correlation dimension...")
                 radii, c_r = correlation_dimension(self.data, m=self.m, tau=self.tau, n_radii=30)
@@ -69,7 +72,20 @@ class ChaosWorker(QThread):
                     results['dimension'] = np.nan
                 results['radii'] = radii
                 results['c_r'] = c_r
-            
+
+            elif self.analysis_type == 'poincare':
+                self.progress.emit("Calculating Poincaré section...")
+                from analysis.embedding import embed_timeseries
+                embedded = embed_timeseries(self.data, self.m, self.tau)
+                crossings = poincare_section(
+                    embedded,
+                    plane=self.poincare_plane,
+                    direction=self.poincare_direction,
+                )
+                results['crossings'] = crossings
+                results['m'] = self.m
+                results['plane'] = self.poincare_plane
+
             self.finished.emit(results)
         except Exception as e:
             self.error.emit(str(e))
@@ -200,7 +216,45 @@ class ChaosAnalysisPanel(QWidget):
         
         corr_group.setLayout(corr_layout)
         layout.addWidget(corr_group)
-        
+
+        # ── Poincaré Section ──────────────────────────────────────
+        poincare_group = QGroupBox(self.tm('chaos_poincare_group'))
+        poincare_layout = QFormLayout()
+
+        self.poincare_axis_spin = QSpinBox()
+        self.poincare_axis_spin.setRange(0, 19)
+        self.poincare_axis_spin.setValue(0)
+        self.poincare_axis_spin.setButtonSymbols(QSpinBox.UpDownArrows)
+        poincare_layout.addRow(self.tm('chaos_poincare_axis'), self.poincare_axis_spin)
+
+        self.poincare_value_spin = QDoubleSpinBox()
+        self.poincare_value_spin.setRange(-1e6, 1e6)
+        self.poincare_value_spin.setValue(0.0)
+        self.poincare_value_spin.setDecimals(4)
+        self.poincare_value_spin.setSingleStep(0.1)
+        self.poincare_value_spin.setButtonSymbols(QDoubleSpinBox.UpDownArrows)
+        poincare_layout.addRow(self.tm('chaos_poincare_value'), self.poincare_value_spin)
+
+        self.poincare_dir_combo = QComboBox()
+        self.poincare_dir_combo.addItem(self.tm('chaos_poincare_dir_up'), 1)
+        self.poincare_dir_combo.addItem(self.tm('chaos_poincare_dir_down'), -1)
+        self.poincare_dir_combo.addItem(self.tm('chaos_poincare_dir_both'), 0)
+        poincare_layout.addRow(self.tm('chaos_poincare_dir'), self.poincare_dir_combo)
+
+        self.calc_poincare_button = QPushButton(self.tm('chaos_calc_poincare'))
+        self.calc_poincare_button.clicked.connect(self.calculate_poincare)
+        self.calc_poincare_button.setEnabled(False)
+        poincare_layout.addRow(self.calc_poincare_button)
+
+        self.poincare_result_label = QLabel("N = ?")
+        self.poincare_result_label.setStyleSheet(
+            "font-size: 14pt; font-weight: bold; color: #2aa198;"
+        )
+        poincare_layout.addRow(self.poincare_result_label)
+
+        poincare_group.setLayout(poincare_layout)
+        layout.addWidget(poincare_group)
+
         # Progress
         self.progress = QProgressBar()
         self.progress.setVisible(False)
@@ -227,10 +281,13 @@ class ChaosAnalysisPanel(QWidget):
         # Manuel spinbox'lara da default değerleri set et
         self.manual_tau_spin.setValue(tau)
         self.manual_m_spin.setValue(m)
-        
+
         self.calc_lyap_button.setEnabled(True)
         self.calc_corr_button.setEnabled(True)
         self.calc_spec_button.setEnabled(True)
+        self.calc_poincare_button.setEnabled(True)
+        # Poincaré ekseni maksimumunu m-1 ile sınırla
+        self.poincare_axis_spin.setMaximum(max(0, m - 1))
 
     def reset_data(self, timeseries=None):
         """Clear cached parameters and results when the source series changes."""
@@ -244,11 +301,13 @@ class ChaosAnalysisPanel(QWidget):
         self.spec_result_label.setText("λ₁, λ₂, ... = ?")
         self.spec_info.clear()
         self.corr_result_label.setText("D₂ = ?")
+        self.poincare_result_label.setText("N = ?")
         self.status_label.setText("")
         self.progress.setVisible(False)
         self.calc_lyap_button.setEnabled(False)
         self.calc_corr_button.setEnabled(False)
         self.calc_spec_button.setEnabled(False)
+        self.calc_poincare_button.setEnabled(False)
     
     def calculate_lyapunov(self):
         if not self._check_ready():
@@ -283,6 +342,27 @@ class ChaosAnalysisPanel(QWidget):
         self.calc_spec_button.setEnabled(False)
         self.worker.start()
     
+    def calculate_poincare(self):
+        if not self._check_ready():
+            return
+        tau, m = self._get_params()
+        axis = self.poincare_axis_spin.value()
+        axis = min(axis, m - 1)   # m'den büyük olamaz
+        plane = {"axis": axis, "value": self.poincare_value_spin.value()}
+        direction = self.poincare_dir_combo.currentData()
+        self.worker = ChaosWorker(
+            self.current_data.data, tau, m,
+            'poincare', dt=self.current_data.dt,
+            poincare_plane=plane, poincare_direction=direction,
+        )
+        self.worker.finished.connect(self.on_poincare_complete)
+        self.worker.error.connect(self.on_error)
+        self.worker.progress.connect(self.on_progress)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.calc_poincare_button.setEnabled(False)
+        self.worker.start()
+
     def calculate_correlation_dim(self):
         if not self._check_ready():
             return
@@ -365,6 +445,23 @@ class ChaosAnalysisPanel(QWidget):
         })
         self.analysis_complete.emit(results)
     
+    def on_poincare_complete(self, results):
+        self.progress.setVisible(False)
+        self.calc_poincare_button.setEnabled(True)
+        self.status_label.setText("")
+
+        crossings = results.get('crossings', np.empty((0, 2)))
+        n = len(crossings)
+        self.poincare_result_label.setText(f"N = {n} crossing points")
+
+        self.plot_requested.emit({
+            'type': 'chaos_poincare',
+            'crossings': crossings,
+            'plane': results.get('plane', {}),
+            'm': results.get('m', 2),
+        })
+        self.analysis_complete.emit(results)
+
     def on_correlation_complete(self, results):
         self.progress.setVisible(False)
         self.calc_corr_button.setEnabled(True)
@@ -387,6 +484,7 @@ class ChaosAnalysisPanel(QWidget):
         self.calc_lyap_button.setEnabled(True)
         self.calc_corr_button.setEnabled(True)
         self.calc_spec_button.setEnabled(True)
+        self.calc_poincare_button.setEnabled(True)
         self.status_label.setText(f"Error: {error_msg}")
     
     def _check_ready(self):

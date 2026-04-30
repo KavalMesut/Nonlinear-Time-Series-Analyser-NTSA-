@@ -10,6 +10,8 @@ A desktop application for nonlinear analysis of chaotic time series. Provides da
 - **Phase Space Visualization**: 2D/3D phase space, return map, attractor structure
 - **Wolf Lyapunov Algorithm**: Faithful implementation of original MATLAB code (KD-Tree based neighbor search). Reference: [Wolf Lyapunov Exponent Estimation (MathWorks)](https://www.mathworks.com/matlabcentral/fileexchange/48084-wolf-lyapunov-exponent-estimation-from-a-time-series?s_tid=FX_rc2_behav)
 - **Rosenstein Lyapunov Algorithm**: Auto-fit largest Lyapunov exponent calculation with multiple window sizes
+- **Full Lyapunov Spectrum**: Sano-Sawada (1985) / Eckmann-Ruelle (1986) method — local Jacobians estimated from the embedding space via ridge regression + periodic QR re-orthonormalization; yields all m exponents, Kaplan-Yorke dimension, and Kolmogorov-Sinai entropy
+- **Poincaré Section**: Axis-aligned or general hyperplane intersection in the embedded phase space, with linear interpolation for accurate crossing points; configurable crossing direction (+/−/both)
 - **Correlation Dimension**: Grassberger-Procaccia algorithm
 - **Linear Analysis**: ACF, PACF, FFT (Hann/Hamming/Blackman windows)
 - **Export/Session Management**: CSV/PNG/JSON export, save/load analysis state (.tsa/.json)

@@ -84,14 +84,14 @@ class PreferencesDialog(QDialog):
         general_layout.addWidget(appearance_group)
         general_layout.addStretch()
         
-        tabs.addTab(general_tab, "Genel")
+        tabs.addTab(general_tab, "General")
         
         # Plot settings tab
         plot_tab = QWidget()
         plot_layout = QVBoxLayout(plot_tab)
         
         # Line settings group
-        line_group = QGroupBox("Çizgi Ayarları")
+        line_group = QGroupBox("Line Settings")
         line_layout = QFormLayout()
         
         # Line color
@@ -99,11 +99,11 @@ class PreferencesDialog(QDialog):
         self.line_color = self.plot_settings.get_color('line_color')
         self.update_color_button(self.line_color_btn, self.line_color)
         self.line_color_btn.clicked.connect(lambda: self.choose_color('line'))
-        line_layout.addRow("Çizgi Rengi:", self.line_color_btn)
+        line_layout.addRow("Line Color:", self.line_color_btn)
         
         # Line width
         line_width_label_layout = QHBoxLayout()
-        line_width_label_layout.addWidget(QLabel("Çizgi Kalınlığı:"))
+        line_width_label_layout.addWidget(QLabel("Line Width:"))
         self.line_width_label = QLabel(f"{self.plot_settings.get('line_width')} px")
         line_width_label_layout.addStretch()
         line_width_label_layout.addWidget(self.line_width_label)
@@ -122,12 +122,12 @@ class PreferencesDialog(QDialog):
         plot_layout.addWidget(line_group)
         
         # Scatter settings group
-        scatter_group = QGroupBox("Nokta Ayarları")
+        scatter_group = QGroupBox("Point Settings")
         scatter_layout = QFormLayout()
         
         # Scatter size
         scatter_size_label_layout = QHBoxLayout()
-        scatter_size_label_layout.addWidget(QLabel("Nokta Boyutu:"))
+        scatter_size_label_layout.addWidget(QLabel("Point Size:"))
         self.scatter_size_label = QLabel(f"{self.plot_settings.get('scatter_size')} px")
         scatter_size_label_layout.addStretch()
         scatter_size_label_layout.addWidget(self.scatter_size_label)
@@ -146,12 +146,12 @@ class PreferencesDialog(QDialog):
         plot_layout.addWidget(scatter_group)
         
         # Grid settings group
-        grid_group = QGroupBox("Grid Ayarları")
+        grid_group = QGroupBox("Grid Settings")
         grid_layout = QVBoxLayout()
         
         # Grid alpha slider
         grid_label_layout = QHBoxLayout()
-        grid_label_layout.addWidget(QLabel("Grid Şeffaflığı:"))
+        grid_label_layout.addWidget(QLabel("Grid Opacity:"))
         self.grid_alpha_label = QLabel(f"{self.plot_settings.get('grid_alpha')}%")
         grid_label_layout.addStretch()
         grid_label_layout.addWidget(self.grid_alpha_label)
@@ -172,7 +172,7 @@ class PreferencesDialog(QDialog):
         plot_layout.addWidget(grid_group)
         
         # Axis settings group
-        axis_group = QGroupBox("Eksen Ayarları")
+        axis_group = QGroupBox("Axis Settings")
         axis_layout = QFormLayout()
         
         # Axis color
@@ -180,11 +180,11 @@ class PreferencesDialog(QDialog):
         self.axis_color = self.plot_settings.get_color('axis_color')
         self.update_color_button(self.axis_color_btn, self.axis_color)
         self.axis_color_btn.clicked.connect(lambda: self.choose_color('axis'))
-        axis_layout.addRow("Eksen Rengi:", self.axis_color_btn)
+        axis_layout.addRow("Axis Color:", self.axis_color_btn)
         
         # Font size
         font_size_label_layout = QHBoxLayout()
-        font_size_label_layout.addWidget(QLabel("Font Boyutu:"))
+        font_size_label_layout.addWidget(QLabel("Font Size:"))
         self.font_size_label = QLabel(f"{self.plot_settings.get('font_size')} pt")
         font_size_label_layout.addStretch()
         font_size_label_layout.addWidget(self.font_size_label)
@@ -203,12 +203,12 @@ class PreferencesDialog(QDialog):
         plot_layout.addWidget(axis_group)
         
         # 3D settings group
-        d3_group = QGroupBox("3D Grafik Ayarları")
+        d3_group = QGroupBox("3D Plot Settings")
         d3_layout = QFormLayout()
         
         # 3D scatter size
         scatter_3d_size_label_layout = QHBoxLayout()
-        scatter_3d_size_label_layout.addWidget(QLabel("3D Nokta Boyutu:"))
+        scatter_3d_size_label_layout.addWidget(QLabel("3D Point Size:"))
         self.scatter_3d_size_label = QLabel(f"{self.plot_settings.get('scatter_3d_size')} px")
         scatter_3d_size_label_layout.addStretch()
         scatter_3d_size_label_layout.addWidget(self.scatter_3d_size_label)
@@ -225,7 +225,7 @@ class PreferencesDialog(QDialog):
         
         # 3D trajectory width
         trajectory_3d_width_label_layout = QHBoxLayout()
-        trajectory_3d_width_label_layout.addWidget(QLabel("3D Trajectory Kalınlığı:"))
+        trajectory_3d_width_label_layout.addWidget(QLabel("3D Trajectory Width:"))
         self.trajectory_3d_width_label = QLabel(f"{self.plot_settings.get('trajectory_3d_width')} px")
         trajectory_3d_width_label_layout.addStretch()
         trajectory_3d_width_label_layout.addWidget(self.trajectory_3d_width_label)
@@ -244,7 +244,7 @@ class PreferencesDialog(QDialog):
         plot_layout.addWidget(d3_group)
         
         # Other settings group
-        other_group = QGroupBox("Diğer Ayarlar")
+        other_group = QGroupBox("Other Settings")
         other_layout = QFormLayout()
         
         # Anti-aliasing
@@ -258,7 +258,7 @@ class PreferencesDialog(QDialog):
         
         plot_layout.addStretch()
         
-        tabs.addTab(plot_tab, "Grafik Ayarları")
+        tabs.addTab(plot_tab, "Plot Settings")
         
         layout.addWidget(tabs)
         
@@ -338,7 +338,7 @@ class PreferencesDialog(QDialog):
         else:
             return
         
-        color = QColorDialog.getColor(current_color, self, "Renk Seç")
+        color = QColorDialog.getColor(current_color, self, "Pick Color")
         if color.isValid():
             if color_type == 'line':
                 self.line_color = color

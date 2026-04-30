@@ -142,7 +142,7 @@ class DataTablePanel(QWidget):
 
         if n > display_n:
             pts_label = self.tm('data_n_points') if self.tm('data_n_points') != 'data_n_points' else 'points'
-            self.lbl_length.setText(f"{n:,} {pts_label} (ilk {display_n:,})")
+            self.lbl_length.setText(f"{n:,} {pts_label} (first {display_n:,})")
 
     def _guess_time_unit(self, dt, meta):
         """dt ve meta bilgisinden zaman birimini tahmin et"""
@@ -195,12 +195,12 @@ class DataTablePanel(QWidget):
             'FFT Power Spectrum': self.tm('plot_fft_power'),
             'AMI (Time Delay)': self.tm('plot_ami_delay'),
             'FNN (Embedding Dim)': self.tm('plot_fnn_dim'),
-            'Lyapunov Divergence': self.tm('plot_lyapunov') + ' - sapma',
+            'Lyapunov Divergence': self.tm('plot_lyapunov') + ' - divergence',
             'Lyapunov Exponent': self.tm('plot_lyapunov'),
             'Lyapunov Spectrum': self.tm('plot_lyapunov_spectrum'),
             'Correlation Dimension': self.tm('plot_correlation_dim'),
-            '2D Phase Space': '2D Faz Uzayı',
-            'Return Map': 'Geri Dönüş Haritası',
+            '2D Phase Space': '2D Phase Space',
+            'Return Map': 'Return Map',
         }
         if isinstance(system_name, str) and system_name.startswith('Preprocessing: '):
             return f"{self.tm('plot_preprocessing')}: {system_name.split(': ', 1)[1]}"
