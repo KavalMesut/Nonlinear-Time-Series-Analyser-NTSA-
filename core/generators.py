@@ -97,7 +97,8 @@ def generate_lorenz(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 100
         y0 = np.array([1.0, 1.0, 1.0])
     
     f = lorenz_system(sigma=sigma, rho=rho, beta=beta)
-    return integrate_ode(f, y0, t_span, dt, system_name="lorenz")
+    return integrate_ode(f, y0, t_span, dt, system_name="lorenz",
+                         params={'sigma': sigma, 'rho': rho, 'beta': round(beta, 4)})
 
 
 def generate_rossler(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 100), 
@@ -112,7 +113,8 @@ def generate_rossler(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 10
         y0 = np.array([1.0, 1.0, 1.0])
     
     f = rossler_system(a=a, b=b, c=c)
-    return integrate_ode(f, y0, t_span, dt, system_name="rossler")
+    return integrate_ode(f, y0, t_span, dt, system_name="rossler",
+                         params={'a': a, 'b': b, 'c': c})
 
 
 def generate_chua(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 100),
@@ -122,7 +124,8 @@ def generate_chua(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 100),
     if y0 is None:
         y0 = np.array([0.7, 0.0, 0.0])
     f = chua_system(alpha=alpha, beta=beta)
-    return integrate_ode(f, y0, t_span, dt, system_name="chua")
+    return integrate_ode(f, y0, t_span, dt, system_name="chua",
+                         params={'alpha': alpha, 'beta': beta})
 
 
 def generate_chen(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 100),
@@ -132,7 +135,8 @@ def generate_chen(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 100),
     if y0 is None:
         y0 = np.array([-0.1, 0.5, -0.6])
     f = chen_system(a=a, b=b, c=c)
-    return integrate_ode(f, y0, t_span, dt, system_name="chen")
+    return integrate_ode(f, y0, t_span, dt, system_name="chen",
+                         params={'a': a, 'b': b, 'c': c})
 
 
 def generate_duffing(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 500),
@@ -143,7 +147,8 @@ def generate_duffing(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 50
     if y0 is None:
         y0 = np.array([1.0, 0.0])
     f = duffing_system(delta=delta, gamma=gamma, omega=omega)
-    return integrate_ode(f, y0, t_span, dt, system_name="duffing")
+    return integrate_ode(f, y0, t_span, dt, system_name="duffing",
+                         params={'delta': delta, 'gamma': gamma, 'omega': omega})
 
 
 def generate_double_pendulum(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 200),
@@ -154,7 +159,8 @@ def generate_double_pendulum(y0: np.ndarray = None, t_span: Tuple[float, float] 
     if y0 is None:
         y0 = np.array([np.pi / 2, np.pi / 2, 0.0, 0.0])
     f = double_pendulum_system(m1=m1, m2=m2, l1=l1, l2=l2, g=g)
-    return integrate_ode(f, y0, t_span, dt, system_name="double_pendulum")
+    return integrate_ode(f, y0, t_span, dt, system_name="double_pendulum",
+                         params={'m1': m1, 'm2': m2, 'l1': l1, 'l2': l2, 'g': g})
 
 
 def tent_map(mu: float = 2.0, x0: float = 0.501, n: int = 1000) -> TimeSeries:
@@ -218,19 +224,4 @@ def generate_sine(amplitude: float = 1.0, frequency: float = 1.0,
         'frequency': frequency
     }
     
-    return TimeSeries(data=data, dt=dt, metadata=metadata)
-
-
-def generate_white_noise(n: int = 1000, dt: float = 0.01, seed: int = None) -> TimeSeries:
-    """Generate white noise for testing"""
-    if seed is not None:
-        np.random.seed(seed)
-    
-    data = np.random.randn(n)
-    
-    metadata = {
-        'system': 'white_noise',
-        'seed': seed
-    }
-    
-    return TimeSeries(data=data, dt=dt, metadata=metadata)
+    return

@@ -89,6 +89,7 @@ class Translations:
         'table_length':        {'tr': 'Uzunluk',           'en': 'Length'},
         'table_duration':      {'tr': 'Toplam Süre',       'en': 'Total Duration'},
         'table_system':        {'tr': 'Sistem',            'en': 'System'},
+        'table_params':        {'tr': 'Parametreler',      'en': 'Parameters'},
         'table_stats':         {'tr': 'İstatistik',        'en': 'Statistics'},
         'table_index':         {'tr': 'İndeks',            'en': 'Index'},
         'table_time':          {'tr': 'Zaman',             'en': 'Time'},
@@ -309,5 +310,5 @@ class TranslationManager:
         return self.available_languages
     
     def __call__(self, key: str) -> str:
-        """Shorthand for get_text"""
+        """Allow using TranslationManager as a callable for backward compatibility"""
         return self.get_text(key)

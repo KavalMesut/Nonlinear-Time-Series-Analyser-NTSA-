@@ -31,12 +31,15 @@ class DataTablePanel(QWidget):
         self.lbl_dt = QLabel("-")
         self.lbl_duration = QLabel("-")
         self.lbl_system = QLabel("-")
+        self.lbl_params = QLabel("-")
+        self.lbl_params.setWordWrap(True)
         self.lbl_stats = QLabel("-")
 
         self._info_layout.addRow(self.tm("table_length") + ":", self.lbl_length)
         self._info_layout.addRow("dt:", self.lbl_dt)
         self._info_layout.addRow(self.tm("table_duration") + ":", self.lbl_duration)
         self._info_layout.addRow(self.tm("table_system") + ":", self.lbl_system)
+        self._info_layout.addRow(self.tm("table_params") + ":", self.lbl_params)
         self._info_layout.addRow(self.tm("table_stats") + ":", self.lbl_stats)
 
         self._info_group.setLayout(self._info_layout)
@@ -64,6 +67,7 @@ class DataTablePanel(QWidget):
         self.lbl_dt.setText("-")
         self.lbl_duration.setText("-")
         self.lbl_system.setText("-")
+        self.lbl_params.setText("-")
         self.lbl_stats.setText("-")
 
     def set_data(self, timeseries):
@@ -83,6 +87,21 @@ class DataTablePanel(QWidget):
         unknown_label = self.tm('msg_unknown') if self.tm('msg_unknown') != 'msg_unknown' else '?'
         system_name = self._localize_system_name(meta.get('system', unknown_label))
         self.lbl_system.setText(system_name)
+
+        # Parameters — ODE sistemleri için meta['params'], haritalar için doğrudan meta
+        _skip = {'system', 'y0', 't_span', 'all_vars_data', 'time_unit', 'value_unit', 'params'}
+        params_dict = meta.get('params') or {k: v for k, v in meta.items() if k not in _skip}
+        if params_dict:
+            parts = []
+            for k, v in params_dict.items():
+                if isinstance(v, float):
+                    parts.append(f"{k}={v:g}")
+                else:
+                    parts.append(f"{k}={v}")
+            self.lbl_params.setText(", ".join(parts))
+        else:
+            self.lbl_params.setText("-")
+
         mean_lbl = 'Ort' if self.tm('table_mean') == 'table_mean' else self.tm('table_mean')
         std_lbl  = 'Std' if self.tm('table_std')  == 'table_std'  else self.tm('table_std')
         self.lbl_stats.setText(
@@ -221,6 +240,9 @@ class DataTablePanel(QWidget):
         lbl = self._info_layout.labelForField(self.lbl_system)
         if lbl:
             lbl.setText(self.tm("table_system") + ":")
+        lbl = self._info_layout.labelForField(self.lbl_params)
+        if lbl:
+            lbl.setText(self.tm("table_params") + ":")
         lbl = self._info_layout.labelForField(self.lbl_stats)
         if lbl:
             lbl.setText(self.tm("table_stats") + ":")

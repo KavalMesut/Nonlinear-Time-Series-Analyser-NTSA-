@@ -16,7 +16,8 @@ def rk4_step(f: Callable, t: float, y: np.ndarray, dt: float) -> np.ndarray:
 
 
 def integrate_ode(f: Callable, y0: np.ndarray, t_span: Tuple[float, float],
-                  dt: float, system_name: str = "ode") -> TimeSeries:
+                  dt: float, system_name: str = "ode",
+                  params: dict = None) -> TimeSeries:
     """
     Integrate ODE system using RK4.
 
@@ -26,6 +27,7 @@ def integrate_ode(f: Callable, y0: np.ndarray, t_span: Tuple[float, float],
         t_span: (t_start, t_end)
         dt: time step
         system_name: name for metadata
+        params: dict of system parameters to store in metadata
 
     Returns:
         TimeSeries object (first variable only)
@@ -40,7 +42,9 @@ def integrate_ode(f: Callable, y0: np.ndarray, t_span: Tuple[float, float],
         y = rk4_step(f, t, y, dt)
         t += dt
         data[i] = y[0]
-    metadata = {'system': system_name, 'y0': y0.tolist(), 't_span': t_span}
+    metadata = {"system": system_name, "y0": y0.tolist(), "t_span": t_span}
+    if params:
+        metadata["params"] = params
     return TimeSeries(data=data, dt=dt, metadata=metadata)
 
 
@@ -81,7 +85,7 @@ def integrate_ode_full(f: Callable, y0: np.ndarray, t_span: Tuple[float, float],
 # ---------------------------------------------------------------------------
 
 def lorenz_system(sigma: float = 10.0, rho: float = 28.0, beta: float = 8.0/3.0):
-    """Lorenz system: dx/dt=sigma*(y-x), dy/dt=x*(rho-z)-y, dz/dt=x*y-beta*z."""
+    """Lorenz system."""
     def f(t: float, y: np.ndarray) -> np.ndarray:
         x, y_val, z = y
         return np.array([sigma*(y_val-x), x*(rho-z)-y_val, x*y_val-beta*z])
@@ -89,7 +93,7 @@ def lorenz_system(sigma: float = 10.0, rho: float = 28.0, beta: float = 8.0/3.0)
 
 
 def rossler_system(a: float = 0.2, b: float = 0.2, c: float = 5.7):
-    """Rossler system: dx/dt=-y-z, dy/dt=x+a*y, dz/dt=b+z*(x-c)."""
+    """Rossler system."""
     def f(t: float, y: np.ndarray) -> np.ndarray:
         x, y_val, z = y
         return np.array([-y_val-z, x+a*y_val, b+z*(x-c)])
@@ -98,7 +102,7 @@ def rossler_system(a: float = 0.2, b: float = 0.2, c: float = 5.7):
 
 def chua_system(alpha: float = 15.6, beta: float = 28.0,
                 m0: float = -1.143, m1: float = -0.714):
-    """Chua's circuit (piecewise linear)."""
+    """Chua circuit (piecewise linear)."""
     def f(t: float, y: np.ndarray) -> np.ndarray:
         x, y_val, z = y
         h = m1*x + 0.5*(m0-m1)*(abs(x+1) - abs(x-1))
@@ -107,7 +111,7 @@ def chua_system(alpha: float = 15.6, beta: float = 28.0,
 
 
 def chen_system(a: float = 35.0, b: float = 3.0, c: float = 28.0):
-    """Chen's system."""
+    """Chen system."""
     def f(t: float, y: np.ndarray) -> np.ndarray:
         x, y_val, z = y
         return np.array([a*(y_val-x), (c-a)*x - x*z + c*y_val, x*y_val - b*z])
@@ -116,10 +120,7 @@ def chen_system(a: float = 35.0, b: float = 3.0, c: float = 28.0):
 
 def duffing_system(alpha: float = -1.0, beta: float = 1.0,
                    delta: float = 0.3, gamma: float = 0.37, omega: float = 1.2):
-    """
-    Forced Duffing Oscillator.
-    x'' + delta*x' + alpha*x + beta*x^3 = gamma*cos(omega*t)
-    """
+    """Forced Duffing Oscillator."""
     def f(t: float, y: np.ndarray) -> np.ndarray:
         y1, y2 = y
         return np.array([
@@ -132,10 +133,7 @@ def duffing_system(alpha: float = -1.0, beta: float = 1.0,
 def double_pendulum_system(m1: float = 1.0, m2: float = 1.0,
                             l1: float = 1.0, l2: float = 1.0,
                             g: float = 9.81):
-    """
-    Cift sarkac sistemi.
-    Durum vektoru: [theta1, theta2, omega1, omega2]
-    """
+    """Double pendulum system. State: [theta1, theta2, omega1, omega2]."""
     def f(t: float, y: np.ndarray) -> np.ndarray:
         th1, th2, w1, w2 = y
         d = th1 - th2
@@ -147,7 +145,7 @@ def double_pendulum_system(m1: float = 1.0, m2: float = 1.0,
                - (m1+m2)*g*np.sin(th1)) / den1
         dw2 = (-m2*l2*w2**2*np.sin(d)*np.cos(d)
                + (m1+m2)*g*np.sin(th1)*np.cos(d)
-               - (m1+m2)*l1*w1**2*np.sin(d)
-               - (m1+m2)*g*np.sin(th2)) / den2
+               - (m1+m2)*g*np.sin(th2)
+               - m2*l1*w1**2*np.sin(d)) / den2
         return np.array([w1, w2, dw1, dw2])
     return f
