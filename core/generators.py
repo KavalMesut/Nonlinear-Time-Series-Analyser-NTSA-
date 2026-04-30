@@ -224,4 +224,19 @@ def generate_sine(amplitude: float = 1.0, frequency: float = 1.0,
         'frequency': frequency
     }
     
-    return
+    return TimeSeries(data=data, dt=dt, metadata=metadata)
+
+
+def generate_white_noise(n: int = 1000, dt: float = 0.01, seed: int = None) -> TimeSeries:
+    """Generate white noise for testing"""
+    if seed is not None:
+        np.random.seed(seed)
+    
+    data = np.random.randn(n)
+    
+    metadata = {
+        'system': 'white_noise',
+        'seed': seed
+    }
+    
+    return TimeSeries(data=data, dt=dt, metadata=metadata)

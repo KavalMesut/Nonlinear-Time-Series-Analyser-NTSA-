@@ -712,9 +712,8 @@ class DataLoadPanel(QWidget):
         self.ode_radio.setText(self.tm('data_ode'))
         self.map_radio.setText(self.tm('data_discrete_map'))
         self.test_systems_radio.setText(self.tm('data_test_systems'))
-        # Sürükle-bırak / dosya seç alanı metni
         self.drop_label.setText(
             self.tm('data_load_file') + '\n\n'
-            + '📁 ' + self.tm('data_browse') + '\n'
-            + '🔽 ' + self.tm('data_drag_drop')
-        
+            + '\U0001f4c1 ' + self.tm('data_browse') + '\n'
+            + '\U0001f53d ' + self.tm('data_drag_drop')
+        )

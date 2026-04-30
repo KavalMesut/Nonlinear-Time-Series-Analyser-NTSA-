@@ -5,7 +5,8 @@ Sadece kontroller — grafik PlotPanel'de gosterilir.
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QGroupBox, QLabel, QSpinBox, QDoubleSpinBox,
-    QFormLayout, QProgressBar, QTextEdit, QComboBox, QScrollArea, QSlider
+    QFormLayout, QProgressBar, QTextEdit, QComboBox, QScrollArea, QSlider,
+    QApplication
 )
 from PySide6.QtCore import Qt, Signal, QThread, QTimer
 import numpy as np
@@ -110,8 +111,14 @@ class ChaosAnalysisPanel(QWidget):
         self._slider_max = 1.0
         self._poincare_timer = QTimer()
         self._poincare_timer.setSingleShot(True)
-        self._poincare_timer.setInterval(150)   # 150 ms debounce
+        self._poincare_timer.setInterval(30)    # 30 ms debounce
         self._poincare_timer.timeout.connect(self._run_poincare_live)
+
+        self._play_timer = QTimer()
+        self._play_timer.setInterval(50)        # 20 fps
+        self._play_timer.timeout.connect(self._play_tick)
+        self._playing = False
+
         self.init_ui()
 
     def init_ui(self):
@@ -250,12 +257,22 @@ class ChaosAnalysisPanel(QWidget):
         slider_header.addWidget(self.poincare_value_label)
         poincare_layout.addLayout(slider_header)
 
+        slider_row = QHBoxLayout()
         self.poincare_slider = QSlider(Qt.Horizontal)
         self.poincare_slider.setRange(0, 1000)
         self.poincare_slider.setValue(500)
         self.poincare_slider.setEnabled(False)
         self.poincare_slider.valueChanged.connect(self._on_poincare_slider_moved)
-        poincare_layout.addWidget(self.poincare_slider)
+        slider_row.addWidget(self.poincare_slider, 1)
+
+        self.poincare_play_btn = QPushButton()
+        self.poincare_play_btn.setFixedWidth(34)
+        self.poincare_play_btn.setEnabled(False)
+        self.poincare_play_btn.setToolTip("Kesiti otomatik tara")
+        self.poincare_play_btn.clicked.connect(self._toggle_play)
+        self._set_play_icon(playing=False)
+        slider_row.addWidget(self.poincare_play_btn)
+        poincare_layout.addLayout(slider_row)
 
         # Min / Max labels below slider
         range_row = QHBoxLayout()
@@ -357,6 +374,8 @@ class ChaosAnalysisPanel(QWidget):
         self.poincare_max_label.setText("--")
         self.poincare_value_label.setText("0.0000")
         self.poincare_slider.setEnabled(False)
+        self._stop_play()
+        self.poincare_play_btn.setEnabled(False)
         self.status_label.setText("")
         self.progress.setVisible(False)
         self.calc_lyap_button.setEnabled(False)
@@ -579,6 +598,7 @@ class ChaosAnalysisPanel(QWidget):
         self.poincare_min_label.setText(f"{self._slider_min:.4g}")
         self.poincare_max_label.setText(f"{self._slider_max:.4g}")
         self.poincare_slider.setEnabled(True)
+        self.poincare_play_btn.setEnabled(True)
 
         # Set slider to mid-point and refresh label
         self.poincare_slider.blockSignals(True)
@@ -639,6 +659,45 @@ class ChaosAnalysisPanel(QWidget):
             'm': self._embedded.shape[1],
         })
 
+    def _set_play_icon(self, playing: bool):
+        style = QApplication.style()
+        if playing:
+            icon = style.standardIcon(style.StandardPixmap.SP_MediaStop)
+            self.poincare_play_btn.setIcon(icon)
+            self.poincare_play_btn.setToolTip("Durdur")
+        else:
+            icon = style.standardIcon(style.StandardPixmap.SP_MediaPlay)
+            self.poincare_play_btn.setIcon(icon)
+            self.poincare_play_btn.setToolTip("Kesiti otomatik tara")
+
+    def _toggle_play(self):
+        if self._playing:
+            self._stop_play()
+        else:
+            self._start_play()
+
+    def _start_play(self):
+        if self._embedded is None:
+            return
+        self._playing = True
+        self._set_play_icon(playing=True)
+        self.poincare_slider.setValue(0)
+        self._play_timer.start()
+
+    def _stop_play(self):
+        self._playing = False
+        self._play_timer.stop()
+        self._set_play_icon(playing=False)
+
+    def _play_tick(self):
+        current = self.poincare_slider.value()
+        step = 5
+        next_val = current + step
+        if next_val > 1000:
+            next_val = 0          # ba\u015fa d\u00f6n, d\u00f6ng\u00fc devam eder
+        self.poincare_slider.setValue(next_val)
+
     def refresh_ui(self):
         self.calc_lyap_button.setText(self.tm('btn_calculate') + ' ' + self.tm('analysis_lyapunov'))
         self.calc_corr_button.setText(self.tm('btn_calculate') + ' ' + self.tm('analysis_correlation_dim'))
+        self

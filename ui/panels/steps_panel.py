@@ -362,7 +362,7 @@ class StepCard(QFrame):
         self.badge = StepIconWidget(index, size=40)
         self.label = QLabel(text)
         self.label.setObjectName("stepLabel")
-        self.label.setFont(QFont("Segoe UI", 9))
+        self.label.setFont(QFont("Segoe UI", 10))
         self.label.setWordWrap(True)
 
         row.addWidget(self.badge)
@@ -463,12 +463,6 @@ class StepsPanel(QWidget):
             card.clicked.connect(self._on_card_clicked)
             self.cards.append(card)
             vbox.addWidget(card)
-            if i < len(self.steps) - 1:
-                dot = QLabel('│')
-                dot.setObjectName("connectorDot")
-                dot.setAlignment(Qt.AlignHCenter)
-                dot.setFixedHeight(14)
-                vbox.addWidget(dot)
 
         vbox.addStretch()
         scroll.setWidget(container)
@@ -493,10 +487,10 @@ class StepsPanel(QWidget):
                 card_active='#1c4246', card_completed='#1c3a2c',
                 border_active='#3d8a90', border_comp='#3d7a50',
                 badge_default='#2a4649', badge_fg_default='#7aaeb2',
-                badge_locked='#1a2e30', badge_fg_locked='#364e52',
+                badge_locked='#1a2e30', badge_fg_locked='#4a7a7e',
                 badge_active='#3d8a90', badge_fg_active='#e8f4f5',
                 badge_comp='#3d7050', badge_fg_comp='#d8f0e0',
-                label_default='#a8c8cc', label_locked='#364e52', label_active='#d4e4e5',
+                label_default='#a8c8cc', label_locked='#6a9ea2', label_active='#d4e4e5',
                 dot_color='#2a4649', status_bg='#192a2c',
                 status_border='#2a4649', status_color='#5a8a8e',
             )
@@ -508,10 +502,10 @@ class StepsPanel(QWidget):
                 card_active='#002800', card_completed='#001a00',
                 border_active='#00ff00', border_comp='#00aa00',
                 badge_default='#2a2a2a', badge_fg_default='#cccccc',
-                badge_locked='#111111', badge_fg_locked='#444444',
+                badge_locked='#111111', badge_fg_locked='#888888',
                 badge_active='#00ff00', badge_fg_active='#000000',
                 badge_comp='#00aa00', badge_fg_comp='#000000',
-                label_default='#dddddd', label_locked='#444444', label_active='#00ff00',
+                label_default='#dddddd', label_locked='#999999', label_active='#00ff00',
                 dot_color='#333333', status_bg='#000000',
                 status_border='#555555', status_color='#aaaaaa',
             )
@@ -523,10 +517,10 @@ class StepsPanel(QWidget):
                 card_active='#193354', card_completed='#1c3020',
                 border_active='#4d8cc4', border_comp='#4a9a4a',
                 badge_default='#333333', badge_fg_default='#808080',
-                badge_locked='#242424', badge_fg_locked='#424242',
+                badge_locked='#242424', badge_fg_locked='#707070',
                 badge_active='#0e639c', badge_fg_active='#ffffff',
                 badge_comp='#3a7a3a', badge_fg_comp='#ffffff',
-                label_default='#b0b0b0', label_locked='#424242', label_active='#e0e0e0',
+                label_default='#b0b0b0', label_locked='#787878', label_active='#e0e0e0',
                 dot_color='#3a3a3a', status_bg='#1a1a1a',
                 status_border='#3a3a3a', status_color='#606060',
             )
