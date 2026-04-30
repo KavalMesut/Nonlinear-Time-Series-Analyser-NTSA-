@@ -11,7 +11,7 @@ A desktop application for nonlinear analysis of chaotic time series. Provides da
 - **Wolf Lyapunov Algorithm**: Faithful implementation of original MATLAB code (KD-Tree based neighbor search). Reference: [Wolf Lyapunov Exponent Estimation (MathWorks)](https://www.mathworks.com/matlabcentral/fileexchange/48084-wolf-lyapunov-exponent-estimation-from-a-time-series?s_tid=FX_rc2_behav)
 - **Rosenstein Lyapunov Algorithm**: Auto-fit largest Lyapunov exponent calculation with multiple window sizes
 - **Full Lyapunov Spectrum**: Sano-Sawada (1985) / Eckmann-Ruelle (1986) method — local Jacobians estimated from the embedding space via ridge regression + periodic QR re-orthonormalization; yields all m exponents, Kaplan-Yorke dimension, and Kolmogorov-Sinai entropy
-- **Poincaré Section**: Axis-aligned or general hyperplane intersection in the embedded phase space, with linear interpolation for accurate crossing points; configurable crossing direction (+/−/both)
+- **Poincaré Section**: Axis-aligned hyperplane intersection in the embedded phase space with linear interpolation; **live slider** lets you sweep the section value in real time without re-embedding; configurable axis and crossing direction (+/−/both)
 - **Correlation Dimension**: Grassberger-Procaccia algorithm
 - **Linear Analysis**: ACF, PACF, FFT (Hann/Hamming/Blackman windows)
 - **Export/Session Management**: CSV/PNG/JSON export, save/load analysis state (.tsa/.json)
@@ -175,6 +175,40 @@ Visualizes phase space created by time-delay embedding:
 - Chaotic/periodic structure analysis
 
 τ and m parameters automatically come from Step 4, manual override available.
+
+### Chaos Analysis (Step 6)
+
+**Lyapunov Exponent:**
+- Wolf algorithm (KD-Tree, faithful MATLAB port) or Rosenstein algorithm
+- Result displayed as λ₁ with qualitative interpretation (chaotic / weak chaos / periodic / stable)
+
+**Full Lyapunov Spectrum:**
+- Sano-Sawada / Eckmann-Ruelle method (local Jacobians + QR re-orthonormalization)
+- Reports all m exponents, Kaplan-Yorke dimension D_KY, and Kolmogorov-Sinai entropy h_KS
+
+**Poincaré Section (live slider):**
+- Select the embedding axis (0 … m−1) and drag the slider to sweep the section plane in real time
+- Embedding is cached on data load — only the fast crossing-detection step reruns on each slider tick (150 ms debounce)
+- Direction: upward crossings (+), downward (−), or both
+- N crossing points shown live; plot updates without clicking Calculate
+
+**Correlation Dimension:**
+- Grassberger-Procaccia, log-log slope estimation over configurable fit range
+
+### Data Summary Panel
+
+Every loaded time series (file or generated) shows a compact summary above the data table:
+
+| Field | Example |
+|---|---|
+| Length | 10,000 points |
+| dt | 0.01 |
+| Total Duration | 100.00 |
+| System | lorenz |
+| **Parameters** | **sigma=10, rho=28, beta=2.6667** |
+| Statistics | Min=… Max=… Mean=… Std=… |
+
+Parameters are populated automatically for all 10 built-in systems and for custom ODE/Map systems.
 
 ## Export and Session Management
 
