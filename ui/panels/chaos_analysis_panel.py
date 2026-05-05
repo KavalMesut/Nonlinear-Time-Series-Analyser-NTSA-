@@ -700,4 +700,8 @@ class ChaosAnalysisPanel(QWidget):
     def refresh_ui(self):
         self.calc_lyap_button.setText(self.tm('btn_calculate') + ' ' + self.tm('analysis_lyapunov'))
         self.calc_corr_button.setText(self.tm('btn_calculate') + ' ' + self.tm('analysis_correlation_dim'))
-        self
+        self.calc_spec_button.setText(self.tm('btn_calculate') + ' ' + self.tm('analysis_lyapunov_spectrum'))
+        self.calc_poincare_button.setText(self.tm('chaos_calc_poincare'))
+        self.poincare_dir_combo.setItemText(0, self.tm('chaos_poincare_dir_up'))
+        self.poincare_dir_combo.setItemText(1, self.tm('chaos_poincare_dir_down'))
+        self.poincare_dir_combo.setItemText(2, self.tm('chaos_poincare_dir_both'))
