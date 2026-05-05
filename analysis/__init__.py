@@ -24,6 +24,12 @@ from .fractal import (
     estimate_dimension_from_correlation,
 )
 from .poincare import poincare_section
+from .parameter_sweep import (
+    bifurcation_sweep,
+    lyapunov_sweep,
+    get_sweepable_params,
+    get_system_info,
+)
 
 __all__ = [
     'compute_acf',
@@ -47,4 +53,8 @@ __all__ = [
     'correlation_dimension',
     'estimate_dimension_from_correlation',
     'poincare_section',
+    'bifurcation_sweep',
+    'lyapunov_sweep',
+    'get_sweepable_params',
+    'get_system_info',
 ]

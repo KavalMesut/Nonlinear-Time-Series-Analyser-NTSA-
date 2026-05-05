@@ -19,7 +19,8 @@ class ChaosWorker(QThread):
     progress = Signal(str)
 
     def __init__(self, data, tau, m, analysis_type, algorithm='rosenstein', dt=1.0,
-                 poincare_plane=None, poincare_direction=1, metadata=None):
+                 poincare_plane=None, poincare_direction=1, metadata=None,
+                 sweep_args=None):
         super().__init__()
         self.data = data
         self.tau = tau
@@ -30,6 +31,7 @@ class ChaosWorker(QThread):
         self.poincare_plane = poincare_plane
         self.poincare_direction = poincare_direction
         self.metadata = metadata or {}
+        self.sweep_args = sweep_args or {}
 
     def run(self):
         try:
@@ -38,6 +40,7 @@ class ChaosWorker(QThread):
                 lyapunov_benettin,
                 estimate_lyapunov_from_curve, correlation_dimension,
                 lyapunov_spectrum, poincare_section,
+                bifurcation_sweep, lyapunov_sweep,
             )
 
             results = {}
@@ -117,6 +120,47 @@ class ChaosWorker(QThread):
                     results['dimension'] = np.nan
                 results['radii'] = radii
                 results['c_r'] = c_r
+
+            elif self.analysis_type == 'bifurcation':
+                args = self.sweep_args
+                sys_name = args['system']
+                sweep_p = args['sweep_param']
+                sweep_vals = args['sweep_values']
+                base_params = args['base_params']
+                self.progress.emit(
+                    f"Bifurcation sweep on {sys_name} ({sweep_p}, "
+                    f"{len(sweep_vals)} values)..."
+                )
+                # ODE icin daha kisa t_total kullan; map'lerde n_map yeter
+                t_total = max(200.0, 200.0 * self.dt * 100)  # ~en az 200 birim
+                bif = bifurcation_sweep(
+                    sys_name, base_params, sweep_p, sweep_vals,
+                    dt=self.dt, t_total=t_total, n_samples=200, n_map=5000,
+                )
+                results['sweep_results'] = bif
+                results['system'] = sys_name
+                results['sweep_param'] = sweep_p
+
+            elif self.analysis_type == 'lyapunov_sweep':
+                args = self.sweep_args
+                sys_name = args['system']
+                sweep_p = args['sweep_param']
+                sweep_vals = args['sweep_values']
+                base_params = args['base_params']
+                method = args.get('method', 'rosenstein')
+                self.progress.emit(
+                    f"Lyapunov sweep ({method}) on {sys_name} ({sweep_p}, "
+                    f"{len(sweep_vals)} values)..."
+                )
+                t_total = max(200.0, 200.0 * self.dt * 100)
+                le_results = lyapunov_sweep(
+                    sys_name, base_params, sweep_p, sweep_vals,
+                    method=method, dt=self.dt, t_total=t_total,
+                )
+                results['sweep_results'] = le_results
+                results['system'] = sys_name
+                results['sweep_param'] = sweep_p
+                results['method'] = method
 
             elif self.analysis_type == 'poincare':
                 self.progress.emit("Calculating Poincare section...")
@@ -362,6 +406,59 @@ class ChaosAnalysisPanel(QWidget):
         poincare_group.setLayout(poincare_layout)
         layout.addWidget(poincare_group)
 
+        # ----- Parameter Sweep (Bifurcation + Lyapunov sweep) -----
+        sweep_group = QGroupBox(self.tm("chaos_sweep_group"))
+        sweep_layout = QVBoxLayout()
+
+        # Sistem etiketi (set_data ile guncellenir)
+        self.sweep_system_label = QLabel("--")
+        self.sweep_system_label.setStyleSheet("color: #888; font-style: italic;")
+        sweep_layout.addWidget(self.sweep_system_label)
+
+        # Parametre dropdown'i + dair satir
+        sweep_form = QFormLayout()
+
+        self.sweep_param_combo = QComboBox()
+        self.sweep_param_combo.currentIndexChanged.connect(self._on_sweep_param_changed)
+        sweep_form.addRow(self.tm("chaos_sweep_param"), self.sweep_param_combo)
+
+        self.sweep_min_spin = QDoubleSpinBox()
+        self.sweep_min_spin.setRange(-1e6, 1e6)
+        self.sweep_min_spin.setDecimals(4)
+        self.sweep_min_spin.setSingleStep(0.1)
+        sweep_form.addRow(self.tm("chaos_sweep_min"), self.sweep_min_spin)
+
+        self.sweep_max_spin = QDoubleSpinBox()
+        self.sweep_max_spin.setRange(-1e6, 1e6)
+        self.sweep_max_spin.setDecimals(4)
+        self.sweep_max_spin.setSingleStep(0.1)
+        sweep_form.addRow(self.tm("chaos_sweep_max"), self.sweep_max_spin)
+
+        self.sweep_steps_spin = QSpinBox()
+        self.sweep_steps_spin.setRange(5, 500)
+        self.sweep_steps_spin.setValue(40)
+        sweep_form.addRow(self.tm("chaos_sweep_steps"), self.sweep_steps_spin)
+
+        sweep_layout.addLayout(sweep_form)
+
+        self.calc_bifurcation_button = QPushButton(self.tm("chaos_calc_bifurcation"))
+        self.calc_bifurcation_button.clicked.connect(self.calculate_bifurcation)
+        self.calc_bifurcation_button.setEnabled(False)
+        sweep_layout.addWidget(self.calc_bifurcation_button)
+
+        self.calc_lyap_sweep_button = QPushButton(self.tm("chaos_calc_lyap_sweep"))
+        self.calc_lyap_sweep_button.clicked.connect(self.calculate_lyapunov_sweep)
+        self.calc_lyap_sweep_button.setEnabled(False)
+        sweep_layout.addWidget(self.calc_lyap_sweep_button)
+
+        self.sweep_result_label = QLabel("")
+        self.sweep_result_label.setStyleSheet("color: #859900; font-weight: bold;")
+        self.sweep_result_label.setWordWrap(True)
+        sweep_layout.addWidget(self.sweep_result_label)
+
+        sweep_group.setLayout(sweep_layout)
+        layout.addWidget(sweep_group)
+
         # Progress
         self.progress = QProgressBar()
         self.progress.setVisible(False)
@@ -406,6 +503,9 @@ class ChaosAnalysisPanel(QWidget):
         # Set initial slider range and enable it
         self._update_slider_range(self.poincare_axis_spin.value())
 
+        # Sweep panelini metadata'ya gore guncelle
+        self._populate_sweep_combo(timeseries.metadata)
+
     def reset_data(self, timeseries=None):
         """Clear cached parameters and results when the source series changes."""
         self.current_data = timeseries
@@ -432,6 +532,181 @@ class ChaosAnalysisPanel(QWidget):
         self.calc_corr_button.setEnabled(False)
         self.calc_spec_button.setEnabled(False)
         self.calc_poincare_button.setEnabled(False)
+        self.calc_bifurcation_button.setEnabled(False)
+        self.calc_lyap_sweep_button.setEnabled(False)
+        self.sweep_param_combo.clear()
+        self.sweep_system_label.setText("--")
+        self.sweep_result_label.setText("")
+
+    # -------- Parameter Sweep helpers --------
+
+    def _populate_sweep_combo(self, metadata):
+        """Metadata.system'a gore sweep_param combo'sunu doldur."""
+        from analysis import get_sweepable_params, get_system_info
+
+        self.sweep_param_combo.blockSignals(True)
+        self.sweep_param_combo.clear()
+
+        sys_name = (metadata.get('system') if metadata else '') or ''
+        info = get_system_info(sys_name)
+        params = get_sweepable_params(metadata) if metadata else {}
+
+        if info is None or not params:
+            self.sweep_system_label.setText(self.tm("chaos_sweep_no_system"))
+            self.calc_bifurcation_button.setEnabled(False)
+            self.calc_lyap_sweep_button.setEnabled(False)
+            self.sweep_param_combo.blockSignals(False)
+            return
+
+        self.sweep_system_label.setText(f"system: {sys_name}")
+        # Her parametre icin combo'ya ekle (current value etiketinde gosterilsin)
+        for name, value in params.items():
+            self.sweep_param_combo.addItem(f"{name} = {value:.4g}", name)
+
+        self.sweep_param_combo.blockSignals(False)
+        self._on_sweep_param_changed()  # Default range hesapla
+
+        self.calc_bifurcation_button.setEnabled(True)
+        self.calc_lyap_sweep_button.setEnabled(True)
+
+    def _on_sweep_param_changed(self):
+        """Secilen parametreye gore default min/max range ayarla (mevcut deger ±50%)."""
+        from analysis import get_sweepable_params
+        if self.current_data is None or self.sweep_param_combo.count() == 0:
+            return
+        param_name = self.sweep_param_combo.currentData()
+        if not param_name:
+            return
+        params = get_sweepable_params(self.current_data.metadata or {})
+        cur_val = params.get(param_name, 1.0)
+        # Default range: cur ± 50%, ama 0 ise [-1, 1]
+        if abs(cur_val) < 1e-10:
+            mn, mx = -1.0, 1.0
+        else:
+            mn = 0.5 * cur_val if cur_val > 0 else 1.5 * cur_val
+            mx = 1.5 * cur_val if cur_val > 0 else 0.5 * cur_val
+        # Lojistik gibi sinirli sistemler icin ozel default
+        sys_name = (self.current_data.metadata.get('system') or '').lower()
+        if sys_name == 'logistic_map':
+            mn, mx = 2.5, 4.0
+        elif sys_name == 'henon_map' and param_name == 'a':
+            mn, mx = 1.0, 1.4
+        elif sys_name == 'lorenz' and param_name == 'rho':
+            mn, mx = 20.0, 40.0
+        elif sys_name == 'rossler' and param_name == 'c':
+            mn, mx = 4.0, 8.0
+        self.sweep_min_spin.setValue(float(mn))
+        self.sweep_max_spin.setValue(float(mx))
+
+    def _get_sweep_args(self):
+        """Sweep icin kullanici girisini topla. None doner gecersizse."""
+        from analysis import get_sweepable_params
+        if self.current_data is None:
+            return None
+        sys_name = (self.current_data.metadata.get('system') or '').lower()
+        if not sys_name:
+            return None
+        param_name = self.sweep_param_combo.currentData()
+        if not param_name:
+            return None
+        sweep_min = float(self.sweep_min_spin.value())
+        sweep_max = float(self.sweep_max_spin.value())
+        n_steps = int(self.sweep_steps_spin.value())
+        if sweep_max <= sweep_min:
+            self.status_label.setText("min < max olmali")
+            return None
+        sweep_values = np.linspace(sweep_min, sweep_max, n_steps)
+        # Diger parametreler sabit kalir
+        all_params = get_sweepable_params(self.current_data.metadata)
+        base_params = {k: v for k, v in all_params.items() if k != param_name}
+        return {
+            'system': sys_name,
+            'base_params': base_params,
+            'sweep_param': param_name,
+            'sweep_values': sweep_values,
+        }
+
+    def calculate_bifurcation(self):
+        args = self._get_sweep_args()
+        if args is None:
+            return
+        self.worker = ChaosWorker(
+            self.current_data.data, self.tau or 1, self.m or 2,
+            'bifurcation', dt=self.current_data.dt,
+            metadata=self.current_data.metadata,
+            sweep_args=args,
+        )
+        self.worker.finished.connect(self.on_bifurcation_complete)
+        self.worker.error.connect(self.on_error)
+        self.worker.progress.connect(self.on_progress)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.calc_bifurcation_button.setEnabled(False)
+        self.worker.start()
+
+    def calculate_lyapunov_sweep(self):
+        args = self._get_sweep_args()
+        if args is None:
+            return
+        algo = self.algo_combo.currentData()
+        args['method'] = algo
+        self.worker = ChaosWorker(
+            self.current_data.data, self.tau or 1, self.m or 2,
+            'lyapunov_sweep', algorithm=algo, dt=self.current_data.dt,
+            metadata=self.current_data.metadata,
+            sweep_args=args,
+        )
+        self.worker.finished.connect(self.on_lyapunov_sweep_complete)
+        self.worker.error.connect(self.on_error)
+        self.worker.progress.connect(self.on_progress)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.calc_lyap_sweep_button.setEnabled(False)
+        self.worker.start()
+
+    def on_bifurcation_complete(self, results):
+        self.progress.setVisible(False)
+        self.calc_bifurcation_button.setEnabled(True)
+        self.status_label.setText("")
+        sweep_results = results.get('sweep_results', [])
+        n_total = len(sweep_results)
+        n_with_data = sum(1 for _, s in sweep_results if len(s) > 0)
+        sys_name = results.get('system', '?')
+        sweep_p = results.get('sweep_param', '?')
+        self.sweep_result_label.setText(
+            f"Bifurcation: {sys_name} {sweep_p}, {n_total} param values, {n_with_data} non-empty"
+        )
+        self.plot_requested.emit({
+            'type': 'chaos_bifurcation',
+            'system': sys_name,
+            'sweep_param': sweep_p,
+            'sweep_results': sweep_results,
+        })
+        self.analysis_complete.emit(results)
+
+    def on_lyapunov_sweep_complete(self, results):
+        self.progress.setVisible(False)
+        self.calc_lyap_sweep_button.setEnabled(True)
+        self.status_label.setText("")
+        sweep_results = results.get('sweep_results', [])
+        sys_name = results.get('system', '?')
+        sweep_p = results.get('sweep_param', '?')
+        method = results.get('method', '?')
+        # Pozitif lambda1 sayisi
+        n_pos = sum(1 for _, l in sweep_results if np.isfinite(l) and l > 0.01)
+        n_total = len(sweep_results)
+        self.sweep_result_label.setText(
+            f"Lyapunov sweep ({method}): {sys_name} {sweep_p}, "
+            f"{n_pos}/{n_total} chaotic (λ₁>0.01)"
+        )
+        self.plot_requested.emit({
+            'type': 'chaos_lyapunov_sweep',
+            'system': sys_name,
+            'sweep_param': sweep_p,
+            'method': method,
+            'sweep_results': sweep_results,
+        })
+        self.analysis_complete.emit(results)
 
     def calculate_lyapunov(self):
         if not self._check_ready():

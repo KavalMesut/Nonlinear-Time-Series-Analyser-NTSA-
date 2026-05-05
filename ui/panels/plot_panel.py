@@ -343,6 +343,10 @@ class PlotPanel(QWidget):
                 self._plot_chaos_correlation(plot_data, widget, title_label)
             elif ptype == 'chaos_poincare':
                 self._plot_poincare(plot_data, widget, title_label)
+            elif ptype == 'chaos_bifurcation':
+                self._plot_chaos_bifurcation(plot_data, widget, title_label)
+            elif ptype == 'chaos_lyapunov_sweep':
+                self._plot_chaos_lyapunov_sweep(plot_data, widget, title_label)
 
     def clear_plot(self):
         """Tüm grafikleri temizle"""
@@ -406,6 +410,10 @@ class PlotPanel(QWidget):
                 self._plot_chaos_correlation(plot_data, self.top_plot_widget, self.top_title_label)
             elif ptype == 'chaos_poincare':
                 self._plot_poincare(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'chaos_bifurcation':
+                self._plot_chaos_bifurcation(plot_data, self.top_plot_widget, self.top_title_label)
+            elif ptype == 'chaos_lyapunov_sweep':
+                self._plot_chaos_lyapunov_sweep(plot_data, self.top_plot_widget, self.top_title_label)
             elif ptype == 'preprocessing':
                 self._plot_preprocessing(plot_data, self.top_plot_widget, self.top_title_label)
             elif ptype == 'embedding_2d':
@@ -466,6 +474,15 @@ class PlotPanel(QWidget):
             return self.tr("plot_lyapunov_spectrum")
         elif ptype == 'chaos_correlation':
             return self.tr("plot_correlation_dim")
+        elif ptype == 'chaos_bifurcation':
+            sys_name = plot_data.get('system', '?')
+            sweep_p = plot_data.get('sweep_param', '?')
+            return f"Bifurcation: {sys_name} ({sweep_p})"
+        elif ptype == 'chaos_lyapunov_sweep':
+            sys_name = plot_data.get('system', '?')
+            sweep_p = plot_data.get('sweep_param', '?')
+            method = plot_data.get('method', '?')
+            return f"Lyapunov sweep: {sys_name} ({sweep_p}, {method})"
         elif ptype == 'chaos_poincare':
             return self.tr("plot_poincare")
         elif ptype == 'preprocessing':
@@ -564,6 +581,10 @@ class PlotPanel(QWidget):
             self._plot_chaos_correlation(plot_data, widget, title_label)
         elif ptype == 'chaos_poincare':
             self._plot_poincare(plot_data, widget, title_label)
+        elif ptype == 'chaos_bifurcation':
+            self._plot_chaos_bifurcation(plot_data, widget, title_label)
+        elif ptype == 'chaos_lyapunov_sweep':
+            self._plot_chaos_lyapunov_sweep(plot_data, widget, title_label)
         elif ptype == 'preprocessing':
             self._plot_preprocessing(plot_data, widget, title_label)
         elif ptype == 'embedding_2d':
@@ -716,6 +737,70 @@ class PlotPanel(QWidget):
             widget.plot(log_r, log_c,
                         pen=self._get_pen(),
                         symbol='o', symbolSize=scatter_size)
+
+    def _plot_chaos_bifurcation(self, d, widget, title_label):
+        """Bifurcation diyagrami: x=parametre, y=sistem ornek noktalari (scatter)."""
+        widget.clear()
+        widget.setLogMode(y=False)
+        sys_name = d.get('system', '?')
+        sweep_p = d.get('sweep_param', '?')
+        title_label.setText(f"Bifurcation: {sys_name} ({sweep_p})")
+        widget.setLabel('left', 'sample value')
+        widget.setLabel('bottom', sweep_p)
+
+        sweep_results = d.get('sweep_results', [])  # [(param_val, samples_array), ...]
+        if not sweep_results:
+            return
+
+        # Tum noktalari tek scatter'a topla
+        xs = []
+        ys = []
+        for param_val, samples in sweep_results:
+            if len(samples) == 0:
+                continue
+            xs.extend([param_val] * len(samples))
+            ys.extend(samples.tolist())
+
+        if not xs:
+            return
+
+        scatter = pg.ScatterPlotItem(
+            x=xs, y=ys,
+            size=2,
+            pen=None,
+            brush=pg.mkBrush(self.plot_settings.get('line_color')),
+        )
+        widget.addItem(scatter)
+
+    def _plot_chaos_lyapunov_sweep(self, d, widget, title_label):
+        """Lyapunov sweep: x=parametre, y=lambda1 (line + sifir cizgisi)."""
+        widget.clear()
+        widget.setLogMode(y=False)
+        sys_name = d.get('system', '?')
+        sweep_p = d.get('sweep_param', '?')
+        method = d.get('method', '?')
+        title_label.setText(f"Lyapunov sweep: {sys_name} ({sweep_p}, {method})")
+        widget.setLabel('left', 'λ₁')
+        widget.setLabel('bottom', sweep_p)
+
+        sweep_results = d.get('sweep_results', [])  # [(param_val, lambda1), ...]
+        if not sweep_results:
+            return
+
+        xs = np.array([p for p, _ in sweep_results], dtype=float)
+        ys = np.array([l for _, l in sweep_results], dtype=float)
+        valid = ~np.isnan(ys)
+        if not np.any(valid):
+            return
+
+        # Sifir referans cizgisi (kaos / stabil sinir)
+        widget.addLine(y=0, pen=pg.mkPen('#888888', width=1, style=Qt.DashLine))
+        # Lambda1 egrisi + noktalar
+        scatter_size = self.plot_settings.get('scatter_size')
+        widget.plot(xs[valid], ys[valid],
+                    pen=self._get_pen(),
+                    symbol='o', symbolSize=scatter_size,
+                    symbolBrush=self.plot_settings.get('line_color'))
 
     def _plot_poincare(self, d, widget, title_label):
         """Poincaré kesiti scatter grafiği."""
