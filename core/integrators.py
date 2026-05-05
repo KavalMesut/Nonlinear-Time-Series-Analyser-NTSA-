@@ -149,3 +149,45 @@ def double_pendulum_system(m1: float = 1.0, m2: float = 1.0,
                - m2*l1*w1**2*np.sin(d)) / den2
         return np.array([w1, w2, dw1, dw2])
     return f
+
+
+# ---------------------------------------------------------------------------
+# Built-in ODE registry (Benettin ve diger ODE-tabanli analizler icin)
+# ---------------------------------------------------------------------------
+
+ODE_SYSTEM_REGISTRY = {
+    'lorenz':          {'factory': lorenz_system,         'dim': 3, 'y0': [1.0, 1.0, 1.0]},
+    'rossler':         {'factory': rossler_system,        'dim': 3, 'y0': [1.0, 1.0, 1.0]},
+    'chua':            {'factory': chua_system,           'dim': 3, 'y0': [0.7, 0.0, 0.0]},
+    'chen':            {'factory': chen_system,           'dim': 3, 'y0': [-10.0, 0.0, 37.0]},
+    'duffing':         {'factory': duffing_system,        'dim': 2, 'y0': [0.0, 0.0]},
+    'double_pendulum': {'factory': double_pendulum_system,'dim': 4, 'y0': [0.5, 0.5, 0.0, 0.0]},
+}
+
+
+def get_ode_system(system_name: str, params: dict = None):
+    """
+    Sistem adina ve parametre sozlugune gore ODE fonksiyonu, default y0
+    ve boyut bilgisini doner.
+
+    Args:
+        system_name: 'lorenz', 'rossler', 'chua', 'chen', 'duffing', 'double_pendulum'
+        params: Sisteme gecirilecek parametre sozlugu. None ise default'lar kullanilir.
+
+    Returns:
+        (ode_func, y0, dim) tuple, sistem bulunmazsa (None, None, 0)
+    """
+    if not system_name:
+        return None, None, 0
+    info = ODE_SYSTEM_REGISTRY.get(system_name.lower())
+    if info is None:
+        return None, None, 0
+    factory = info['factory']
+    if params is None:
+        params = {}
+    # Sadece factory'nin kabul ettigi anahtarlari gecir
+    import inspect
+    sig = inspect.signature(factory)
+    valid_kwargs = {k: v for k, v in params.items() if k in sig.parameters}
+    ode_func = factory(**valid_kwargs)
+    return ode_func, np.array(info['y0'], dtype=float), info['dim']

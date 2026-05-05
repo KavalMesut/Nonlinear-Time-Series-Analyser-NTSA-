@@ -26,6 +26,7 @@ from scipy.spatial import cKDTree
 
 from .embedding import embed_timeseries
 from .acf import compute_acf
+from core.integrators import rk4_step
 
 
 def _build_kdtree(embedded: np.ndarray) -> cKDTree:
@@ -1121,6 +1122,156 @@ def kaplan_yorke_dimension(exponents: np.ndarray) -> float:
         D_KY float
     """
     return _kaplan_yorke_dimension(exponents)
+
+
+# ---------------------------------------------------------------------------
+# Benettin (1980) — ODE icin altin standart Lyapunov spektrumu
+# ---------------------------------------------------------------------------
+
+def _numerical_jacobian(ode_func, t, y, eps=1e-7):
+    """Merkezi farklarla sayisal Jacobian (J[i,j] = df_i/dy_j)."""
+    n = len(y)
+    J = np.empty((n, n))
+    for j in range(n):
+        e = np.zeros(n)
+        e[j] = eps
+        f_plus = np.asarray(ode_func(t, y + e))
+        f_minus = np.asarray(ode_func(t, y - e))
+        J[:, j] = (f_plus - f_minus) / (2.0 * eps)
+    return J
+
+
+def lyapunov_benettin(ode_func,
+                      y0,
+                      t_span=(0.0, 100.0),
+                      dt: float = 0.01,
+                      transient: int = 2000,
+                      n_exponents: int = None,
+                      qr_interval: int = 1,
+                      jacobian_func=None,
+                      jacobian_eps: float = 1e-7) -> dict:
+    """
+    Benettin et al. (1980) Lyapunov spektrumu — ODE icin altin standart.
+
+    Trajektori (y) + variational denklem (Q, n x n_exponents) eszamanli RK4
+    ile entegre edilir. Periyodik QR ortonormalizasyonuyla biriken log(diag(R))
+    degerleri toplam zamana bolunerek ustel tahmini elde edilir.
+
+    Embedding YOK: gercek Jacobian kullanildigi icin Sano-Sawada/Eckmann-Ruelle'in
+    lokal Jacobian tahmin hatasi yoktur. CSV verisi ile calismaz; sadece denklem
+    bilindigi durumlarda kullanilir (built-in sistemler, Custom ODE).
+
+    Args:
+        ode_func: f(t, y) -> dy/dt fonksiyonu, dim n
+        y0: baslangic kosulu, shape (n,)
+        t_span: (t_start, t_end)
+        dt: zaman adimi
+        transient: Q hesabi baslamadan once atlanacak adim sayisi
+        n_exponents: hesaplanacak ustel sayisi (varsayilan: n, yani tam spektrum)
+        qr_interval: kac adimda bir QR yapilsin (1 = her adim, daha guvenli)
+        jacobian_func: opsiyonel J(t, y) -> n x n. None ise sayisal merkezi fark.
+        jacobian_eps: sayisal Jacobian icin perturbasyon
+
+    Returns:
+        dict:
+            'exponents'           – buyukten kucuge sirali (n_exponents,)
+            'exponents_convergence' – her QR'de cari tahmin (n_qr, n_exponents)
+            'kaplan_yorke_dim'    – D_KY
+            'kolmogorov_sinai'    – pozitif ustellerin toplami (h_KS)
+            'n_steps'             – Benettin'in cevirdigi adim sayisi (transient sonrasi)
+            'method'              – 'Benettin'
+    """
+    y = np.asarray(y0, dtype=float).copy()
+    n = y.size
+    if n_exponents is None:
+        n_exponents = n
+    n_exponents = max(1, min(int(n_exponents), n))
+
+    t_start, t_end = t_span
+    n_steps_total = int((t_end - t_start) / dt)
+    transient = int(max(0, transient))
+    if transient >= n_steps_total:
+        raise ValueError(f"transient ({transient}) >= total steps ({n_steps_total})")
+
+    # 1. Transient: sadece y'yi entegre et, Q hesaplama
+    t = float(t_start)
+    for _ in range(transient):
+        y = rk4_step(ode_func, t, y, dt)
+        t += dt
+
+    # 2. Q'yu identity olarak baslat
+    Q = np.eye(n, n_exponents, dtype=float)
+
+    def jac_at(tt, yy):
+        if jacobian_func is not None:
+            return np.asarray(jacobian_func(tt, yy), dtype=float)
+        return _numerical_jacobian(ode_func, tt, yy, eps=jacobian_eps)
+
+    log_diag_sum = np.zeros(n_exponents)
+    convergence_list = []
+    n_active = n_steps_total - transient
+
+    # 3. Birlestirilmis RK4 + periyodik QR
+    for step in range(n_active):
+        # k1
+        dy1 = np.asarray(ode_func(t, y))
+        dQ1 = jac_at(t, y) @ Q
+        # k2
+        y2 = y + 0.5 * dt * dy1
+        Q2 = Q + 0.5 * dt * dQ1
+        dy2 = np.asarray(ode_func(t + 0.5 * dt, y2))
+        dQ2 = jac_at(t + 0.5 * dt, y2) @ Q2
+        # k3
+        y3 = y + 0.5 * dt * dy2
+        Q3 = Q + 0.5 * dt * dQ2
+        dy3 = np.asarray(ode_func(t + 0.5 * dt, y3))
+        dQ3 = jac_at(t + 0.5 * dt, y3) @ Q3
+        # k4
+        y4 = y + dt * dy3
+        Q4 = Q + dt * dQ3
+        dy4 = np.asarray(ode_func(t + dt, y4))
+        dQ4 = jac_at(t + dt, y4) @ Q4
+
+        y = y + (dt / 6.0) * (dy1 + 2.0 * dy2 + 2.0 * dy3 + dy4)
+        Q = Q + (dt / 6.0) * (dQ1 + 2.0 * dQ2 + 2.0 * dQ3 + dQ4)
+        t += dt
+
+        # Periyodik QR — Q'yu yeniden ortonormalle, R'nin diagonalini biriktir
+        if (step + 1) % qr_interval == 0:
+            Q_new, R = np.linalg.qr(Q)
+            # numpy QR isaret konvansiyonu: R diagonalini pozitife zorla
+            sign = np.sign(np.diag(R))
+            sign[sign == 0] = 1.0
+            Q = Q_new * sign  # her sutuna isaretini uygula (broadcast)
+            R_diag = np.abs(np.diag(R))
+            R_diag = np.maximum(R_diag, 1e-300)  # log(0) korumasi
+            log_diag_sum += np.log(R_diag)
+
+            elapsed_t = (step + 1) * dt
+            convergence_list.append(log_diag_sum / elapsed_t)
+
+    total_t = n_active * dt
+    if total_t <= 0:
+        raise ValueError("Benettin: total integration time <= 0")
+    exponents = log_diag_sum / total_t
+    # Buyukten kucuge sirala
+    order = np.argsort(exponents)[::-1]
+    exponents_sorted = exponents[order]
+
+    # Convergence dizisini ayni siralamaya goturmuyoruz (zamansal akış icin orijinal kalsin)
+    convergence_arr = np.array(convergence_list) if convergence_list else np.empty((0, n_exponents))
+
+    ky_dim = _kaplan_yorke_dimension(exponents_sorted)
+    ks_entropy = float(np.sum(exponents_sorted[exponents_sorted > 0]))
+
+    return {
+        'exponents': exponents_sorted,
+        'exponents_convergence': convergence_arr,
+        'kaplan_yorke_dim': ky_dim,
+        'kolmogorov_sinai': ks_entropy,
+        'n_steps': n_active,
+        'method': 'Benettin',
+    }
 
 
 def _kaplan_yorke_dimension(exponents: np.ndarray) -> float:

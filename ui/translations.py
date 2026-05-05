@@ -130,6 +130,8 @@ class Translations:
         'chaos_manual_params':    {'tr': 'Manuel Parametreleri Kullan','en': 'Use Manual Parameters'},
         'chaos_wolf':             {'tr': 'Wolf Algoritması',            'en': 'Wolf Algorithm'},
         'chaos_rosenstein':       {'tr': 'Rosenstein Algoritması',      'en': 'Rosenstein Algorithm'},
+        'chaos_kantz':            {'tr': 'Kantz Algoritması',           'en': 'Kantz Algorithm'},
+        'chaos_benettin':         {'tr': 'Benettin (ODE - altın standart)', 'en': 'Benettin (ODE - gold standard)'},
         'chaos_spectrum_group':   {'tr': 'Lyapunov Spektrumu',          'en': 'Lyapunov Spectrum'},
         'chaos_calc_spectrum':    {'tr': 'Tam Spektrumu Hesapla',       'en': 'Calculate Full Spectrum'},
         'chaos_calc_corr':        {'tr': 'Korelasyon Boyutu Hesapla',   'en': 'Calculate Correlation Dim'},

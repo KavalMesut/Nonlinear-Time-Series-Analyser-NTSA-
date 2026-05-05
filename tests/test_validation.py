@@ -352,6 +352,12 @@ def run_reference_validation():
         print(f"  Rosenstein  = {ros_le:.4f} | Err: {err_ros:.1f}% | R2={bundle['rosenstein']['r2']:.4f} | fit=[{bundle['rosenstein'].get('fit_start', 0)}:{bundle['rosenstein'].get('fit_end', 0)}]")
         print(f"  Kantz       = {kantz_le:.4f} | Err: {err_kantz:.1f}% | R2={bundle['kantz']['r2']:.4f} | fit=[{bundle['kantz'].get('fit_start', 0)}:{bundle['kantz'].get('fit_end', 0)}]")
 
+        # Test #6: Algoritma fark uyarisi
+        finite_methods = [v for v in (wolf_le, ros_le, kantz_le) if np.isfinite(v)]
+        disagree = (max(finite_methods) - min(finite_methods)) if len(finite_methods) >= 2 else float('nan')
+        disagree_flag = " ! METHODS DIVERGE" if np.isfinite(disagree) and disagree > 0.1 else ""
+        print(f"  Disagree    = {disagree:.4f} (max-min over methods){disagree_flag}")
+
         stability = compute_le_stability(data, m=m, tau=tau, dt=dt, method='rosenstein')
         stab_cv = stability['cv']
         stab_mark = "STABLE" if stability['stable'] else "UNSTABLE"
@@ -369,6 +375,9 @@ def run_reference_validation():
         elapsed = time.time() - sys_start
         print(f"  Time: {elapsed:.1f}s")
 
+        # Test #1: Mutlak fark
+        best_abs = abs(best['le'] - exp) if np.isfinite(best['le']) else float('nan')
+
         records.append({
             'category': category,
             'name': name,
@@ -384,6 +393,8 @@ def run_reference_validation():
             'best_method': best['method'],
             'best_le': best['le'],
             'best_err': best['error'],
+            'best_abs': best_abs,
+            'disagree': disagree,
             'w_err': err_wolf,
             'r_err': err_ros,
             'k_err': err_kantz,
@@ -451,8 +462,9 @@ def append_reference_section(lines, records, title, category_filter):
         f"{'Wolf LE':8s} | {'W.Std':6s} | "
         f"{'Ros LE':8s} | {'R.R2':6s} | "
         f"{'Kantz LE':8s} | {'K.R2':6s} | "
-        f"{'Best':{best_col_width}s} | {'B.Err%':7s} | "
-        f"{'CV':6s} | {'Time':5s} | {'W.Err%':7s} | {'R.Err%':7s} | {'K.Err%':7s}"
+        f"{'Best':{best_col_width}s} | {'B.Err%':7s} | {'B.Abs':7s} | "
+        f"{'Disagr':7s} | {'CV':6s} | {'Time':5s} | "
+        f"{'W.Err%':7s} | {'R.Err%':7s} | {'K.Err%':7s}"
     )
     width = len(header)
 
@@ -469,14 +481,19 @@ def append_reference_section(lines, records, title, category_filter):
             f"{record['best_method']}:{record['best_le']:.4f}"
             if np.isfinite(record['best_le']) else f"{record['best_method']}:nan"
         )
+        b_abs = record.get('best_abs', float('nan'))
+        b_abs_str = f"{b_abs:7.4f}" if np.isfinite(b_abs) else "    nan"
+        dis = record.get('disagree', float('nan'))
+        dis_flag = "!" if np.isfinite(dis) and dis > 0.1 else " "
+        dis_str = f"{dis:6.3f}{dis_flag}" if np.isfinite(dis) else "   n/a "
 
         lines.append(
             f"{record['name']:10s} | {record['expected']:8.4f} | {record['m']:2d} | {record['tau']:3d} | "
             f"{record['wolf_le']:8.4f} | {record['wolf_std']:6.3f} | "
             f"{record['ros_le']:8.4f} | {record['ros_r2']:6.4f} | "
             f"{record['kantz_le']:8.4f} | {record['kantz_r2']:6.4f} | "
-            f"{best_str:{best_col_width}s} | {record['best_err']:6.1f}% | "
-            f"{cv_str}{stab_flag} | {record['elapsed']:5.1f}s | "
+            f"{best_str:{best_col_width}s} | {record['best_err']:6.1f}% | {b_abs_str} | "
+            f"{dis_str} | {cv_str}{stab_flag} | {record['elapsed']:5.1f}s | "
             f"{record['w_err']:6.1f}% | {record['r_err']:6.1f}% | {record['k_err']:6.1f}%"
         )
 
@@ -491,8 +508,9 @@ def append_sanity_section(lines, records):
         f"{'Wolf LE':8s} | {'W.Std':6s} | "
         f"{'Ros LE':8s} | {'R.R2':6s} | "
         f"{'Kantz LE':8s} | {'K.R2':6s} | "
-        f"{'Best':{best_col_width}s} | {'B.Err%':7s} | "
-        f"{'CV':6s} | {'Time':5s} | {'W.Err%':7s} | {'R.Err%':7s} | {'K.Err%':7s}"
+        f"{'Best':{best_col_width}s} | {'B.Err%':7s} | {'B.Abs':7s} | "
+        f"{'Disagr':7s} | {'CV':6s} | {'Time':5s} | "
+        f"{'W.Err%':7s} | {'R.Err%':7s} | {'K.Err%':7s}"
     )
     width = len(header)
     lines.append("\n" + "=" * width)
@@ -504,6 +522,7 @@ def append_sanity_section(lines, records):
         expected_str = f"{record['expected']:.4f}" if np.isfinite(record['expected']) else "n/a"
         best_le = np.nan
         best_err = np.nan
+        best_abs = np.nan
         w_err = np.nan
         r_err = np.nan
         k_err = np.nan
@@ -521,19 +540,27 @@ def append_sanity_section(lines, records):
                 best = choose_validation_estimate(expected, negative_only)
                 best_le = best['le']
                 best_err = best['error']
+                best_abs = abs(best_le - expected) if np.isfinite(best_le) else np.nan
             w_err = relative_error_percent(record['wolf_le'], expected)
             r_err = relative_error_percent(record['ros_le'], expected)
             k_err = relative_error_percent(record['kantz_le'], expected)
 
+        # Test #6: Disagreement (sanity'de de hesapla)
+        finite_methods = [v for v in (record['wolf_le'], record['ros_le'], record['kantz_le']) if np.isfinite(v)]
+        disagree = (max(finite_methods) - min(finite_methods)) if len(finite_methods) >= 2 else float('nan')
+        dis_flag = "!" if np.isfinite(disagree) and disagree > 0.1 else " "
+        dis_str = f"{disagree:6.3f}{dis_flag}" if np.isfinite(disagree) else "   n/a "
+
         best_str = record['status'] if not np.isfinite(best_le) else f"{record['status']}:{best_le:.4f}"
+        b_abs_str = f"{best_abs:7.4f}" if np.isfinite(best_abs) else "    n/a"
         lines.append(
             f"{record['name']:10.10s} | {expected_str:8s} | {record['m']:2d} | {record['tau']:3d} | "
             f"{record['wolf_le']:8.4f} | {'n/a':6s} | "
             f"{record['ros_le']:8.4f} | {'n/a':6s} | "
             f"{record['kantz_le']:8.4f} | {'n/a':6s} | "
             f"{best_str:{best_col_width}s} | "
-            f"{(f'{best_err:.1f}%' if np.isfinite(best_err) else 'n/a'):7s} | "
-            f"{cv_str:6s} | {record['elapsed']:5.1f}s | "
+            f"{(f'{best_err:.1f}%' if np.isfinite(best_err) else 'n/a'):7s} | {b_abs_str} | "
+            f"{dis_str} | {cv_str:6s} | {record['elapsed']:5.1f}s | "
             f"{(f'{w_err:.1f}%' if np.isfinite(w_err) else 'n/a'):7s} | "
             f"{(f'{r_err:.1f}%' if np.isfinite(r_err) else 'n/a'):7s} | "
             f"{(f'{k_err:.1f}%' if np.isfinite(k_err) else 'n/a'):7s}"
@@ -553,6 +580,7 @@ def append_statistics(lines, records, total_elapsed):
     best_under10 = sum(np.isfinite(r['best_err']) and r['best_err'] < 10.0 for r in records)
     best_under20 = sum(np.isfinite(r['best_err']) and r['best_err'] < 20.0 for r in records)
     stable_count = sum(r['stable'] for r in records)
+    diverge_count = sum(np.isfinite(r.get('disagree', np.nan)) and r['disagree'] > 0.1 for r in records)
 
     lines.append(f"\n{'=' * 60}")
     lines.append("STATISTICS")
@@ -566,12 +594,15 @@ def append_statistics(lines, records, total_elapsed):
     lines.append(f"Best estimate (<10%): {best_under10}/{n_sys}")
     lines.append(f"Best estimate (<20%): {best_under20}/{n_sys}")
     lines.append(f"LE Stability (CV<0.20): {stable_count}/{n_sys}")
+    lines.append(f"Method Disagreement (max-min > 0.1): {diverge_count}/{n_sys}")
     lines.append(f"Total reference time: {total_elapsed:.1f}s")
     lines.append(f"{'=' * 60}")
     lines.append("\nNOTES:")
     lines.append("- Core systems are the primary literature-aligned confidence set.")
     lines.append("- Challenge cases are intentionally harder and less robust.")
     lines.append("- Wolf, Rosenstein, and Kantz are all reported diagnostically.")
+    lines.append("- B.Abs = |best_estimate - expected| (mutlak fark, % hatadan bagimsiz olcum).")
+    lines.append("- Disagr = max - min Lyapunov exponent over Wolf/Rosenstein/Kantz; '!' isareti disagree>0.1 demek.")
     lines.append("- Sanity checks are separate because percentage error is not meaningful there.")
 
 

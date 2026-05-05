@@ -18,8 +18,8 @@ class ChaosWorker(QThread):
     error = Signal(str)
     progress = Signal(str)
 
-    def __init__(self, data, tau, m, analysis_type, algorithm='wolf', dt=1.0,
-                 poincare_plane=None, poincare_direction=1):
+    def __init__(self, data, tau, m, analysis_type, algorithm='rosenstein', dt=1.0,
+                 poincare_plane=None, poincare_direction=1, metadata=None):
         super().__init__()
         self.data = data
         self.tau = tau
@@ -29,11 +29,13 @@ class ChaosWorker(QThread):
         self.dt = dt
         self.poincare_plane = poincare_plane
         self.poincare_direction = poincare_direction
+        self.metadata = metadata or {}
 
     def run(self):
         try:
             from analysis import (
-                lyapunov_wolf, lyapunov_rosenstein,
+                lyapunov_wolf, lyapunov_rosenstein, lyapunov_kantz,
+                lyapunov_benettin,
                 estimate_lyapunov_from_curve, correlation_dimension,
                 lyapunov_spectrum, poincare_section,
             )
@@ -46,6 +48,48 @@ class ChaosWorker(QThread):
                     lyap = lyapunov_wolf(self.data, m=self.m, tau=self.tau, dt=self.dt)
                     results['lyapunov'] = lyap
                     results['algorithm'] = 'Wolf'
+                elif self.algorithm == 'kantz':
+                    self.progress.emit("Calculating Lyapunov exponent (Kantz algorithm)...")
+                    t_steps, divergence = lyapunov_kantz(self.data, m=self.m, tau=self.tau, dt=self.dt)
+                    fit_end = min(30, len(t_steps))
+                    lyap = estimate_lyapunov_from_curve(t_steps, divergence, fit_start=0, fit_end=fit_end)
+                    results['lyapunov'] = lyap
+                    results['t_steps'] = t_steps
+                    results['divergence'] = divergence
+                    results['algorithm'] = 'Kantz'
+                elif self.algorithm == 'benettin':
+                    # Benettin gercek Jacobian gerektirir; metadata'dan ODE'yi al
+                    from core import get_ode_system, ODE_SYSTEM_REGISTRY
+                    system = (self.metadata.get('system') or '').lower()
+                    if system not in ODE_SYSTEM_REGISTRY:
+                        raise ValueError(
+                            f"Benettin built-in ODE sistemi gerektirir. "
+                            f"Mevcut sistem: '{system or 'bilinmiyor'}'. "
+                            f"Desteklenen: {', '.join(ODE_SYSTEM_REGISTRY.keys())}"
+                        )
+                    params = self.metadata.get('params', {}) or {}
+                    ode_func, default_y0, dim = get_ode_system(system, params)
+                    # Original y0 varsa onu kullan, yoksa registry default
+                    y0_meta = self.metadata.get('y0')
+                    y0 = np.array(y0_meta, dtype=float) if y0_meta else default_y0
+                    # Entegrasyon zamani: en az 200 birim ya da veri uzunlugu
+                    t_total = max(200.0, len(self.data) * self.dt)
+                    self.progress.emit(
+                        f"Calculating Lyapunov spectrum (Benettin) on {system} "
+                        f"(t_total={t_total:.0f}, dim={dim})..."
+                    )
+                    spec = lyapunov_benettin(
+                        ode_func, y0,
+                        t_span=(0.0, t_total),
+                        dt=self.dt,
+                        transient=2000,
+                        n_exponents=dim,
+                        qr_interval=1,
+                    )
+                    exponents = spec['exponents']
+                    results['lyapunov'] = float(exponents[0]) if len(exponents) > 0 else float('nan')
+                    results['spectrum'] = spec
+                    results['algorithm'] = 'Benettin'
                 else:
                     self.progress.emit("Calculating Lyapunov exponent (Rosenstein algorithm)...")
                     t_steps, divergence = lyapunov_rosenstein(self.data, m=self.m, tau=self.tau, dt=self.dt)
@@ -165,8 +209,14 @@ class ChaosAnalysisPanel(QWidget):
         params_layout.addRow("", self.use_manual_check)
 
         self.algo_combo = QComboBox()
-        self.algo_combo.addItem(self.tm("chaos_wolf"), "wolf")
+        # Rosenstein default; Wolf surekli sistemlerde sistematik overestimate yapiyor
+        # (robustness testleri: Lorenz temiz veride %87 sapma, gurultude %800+).
+        # Benettin sadece built-in ODE sistemler ya da Custom ODE icin geceriidir
+        # (metadata'da 'system' alani gerekiyor).
         self.algo_combo.addItem(self.tm("chaos_rosenstein"), "rosenstein")
+        self.algo_combo.addItem(self.tm("chaos_kantz"), "kantz")
+        self.algo_combo.addItem(self.tm("chaos_wolf"), "wolf")
+        self.algo_combo.addItem(self.tm("chaos_benettin"), "benettin")
         params_layout.addRow("Algorithm:", self.algo_combo)
 
         params_group.setLayout(params_layout)
@@ -390,7 +440,8 @@ class ChaosAnalysisPanel(QWidget):
         algo = self.algo_combo.currentData()
         self.worker = ChaosWorker(
             self.current_data.data, tau, m,
-            'lyapunov', algorithm=algo, dt=self.current_data.dt
+            'lyapunov', algorithm=algo, dt=self.current_data.dt,
+            metadata=self.current_data.metadata,
         )
         self.worker.finished.connect(self.on_lyapunov_complete)
         self.worker.error.connect(self.on_error)
@@ -471,6 +522,19 @@ class ChaosAnalysisPanel(QWidget):
             info += "Near zero - Periodic or quasi-periodic\n"
         else:
             info += "Negative exponent - Stable/damped system\n"
+
+        # Benettin tam spektrum doner — ek bilgileri goster
+        spec = results.get('spectrum')
+        if spec is not None:
+            exps = spec.get('exponents', np.array([]))
+            ky = spec.get('kaplan_yorke_dim', np.nan)
+            ks = spec.get('kolmogorov_sinai', np.nan)
+            if len(exps) > 0:
+                info += "\nFull spectrum (Benettin, true Jacobian):\n"
+                info += "  " + "  ".join(f"λ{i+1}={e:.4f}" for i, e in enumerate(exps)) + "\n"
+                info += f"  Kaplan-Yorke dim D_KY = {ky:.4f}\n"
+                info += f"  Kolmogorov-Sinai entropy h_KS = {ks:.4f}\n"
+
         self.lyap_info.setText(info)
 
         self.plot_requested.emit({

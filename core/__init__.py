@@ -17,7 +17,7 @@ from .generators import (
     generate_sine,
     generate_white_noise
 )
-from .integrators import integrate_ode, rk4_step
+from .integrators import integrate_ode, rk4_step, get_ode_system, ODE_SYSTEM_REGISTRY
 from .loaders import load_csv, load_txt
 
 __all__ = [
@@ -37,6 +37,8 @@ __all__ = [
     'generate_white_noise',
     'integrate_ode',
     'rk4_step',
+    'get_ode_system',
+    'ODE_SYSTEM_REGISTRY',
     'load_csv',
     'load_txt'
 ]
