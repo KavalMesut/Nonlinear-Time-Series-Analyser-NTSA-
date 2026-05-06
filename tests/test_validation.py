@@ -148,16 +148,22 @@ def generate_contractive_map(n=5000, lam=0.8, x0=1.0) -> TimeSeries:
 
 
 def build_reference_systems():
+    # NOT: dt degerleri tests/test_dt_sweep.py'deki sweep sonuclarina gore
+    # her sistem icin optimize edildi. Onemli degisiklikler:
+    #   Rossler: dt 0.1 -> 0.02  (Rosenstein hatasi %19 -> %0.3)
+    #   Duffing: dt 0.1 -> 0.02  (%47.9 -> %1.8)
+    #   Lorenz : dt 0.01 -> 0.02 (%11 -> %1.4)
     return [
-        ('Core', "Lorenz", generate_lorenz, 0.9056, 0.01, 8, False, {}),
-        ('Core', "Rossler", generate_rossler, 0.0714, 0.1, 1, False, {'t_span': (0, 2000)}),
+        ('Core', "Lorenz", generate_lorenz, 0.9056, 0.02, 8, False, {}),
+        ('Core', "Rossler", generate_rossler, 0.0714, 0.02, 1, False,
+         {'t_span': (0, 2000), 'transient': 10000}),
         ('Core', "Chua", generate_chua, 0.33, 0.1, 1, False, {'t_span': (0, 2000)}),
         ('Core', "Chen", generate_chen, 2.027, 0.01, 5, False, {}),
         ('Core', "Logistic", logistic_map, np.log(2), 1.0, 1, True, {}),
         ('Core', "Henon", henon_map, 0.4200, 1.0, 1, True, {}),
         ('Core', "Ikeda", ikeda_map, 0.5100, 1.0, 1, True, {}),
-        ('Challenge', "Duffing", generate_duffing, 0.16, 0.1, 1, False,
-         {'t_span': (0, 6000), 'gamma': 0.5, 'transient': 5000}),
+        ('Challenge', "Duffing", generate_duffing, 0.16, 0.02, 1, False,
+         {'t_span': (0, 6000), 'gamma': 0.5, 'transient': 25000}),
         ('Challenge', "DoublePen", generate_double_pendulum, 0.5, 0.01, 5, False,
          {'t_span': (0, 500), 'transient': 2000}),
     ]

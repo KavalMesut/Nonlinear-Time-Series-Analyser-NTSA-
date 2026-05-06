@@ -323,6 +323,9 @@ class DataLoadPanel(QWidget):
         self.system_combo.addItem('Tent Map', 'tent')
         self.system_combo.addItem(self.tm('data_sine'), 'sine')
         self.system_combo.addItem('Ikeda Map', 'ikeda')
+        # Sistem secimine gore optimal dt'yi otomatik onerir
+        # (kaynak: tests/test_dt_sweep.py)
+        self.system_combo.currentIndexChanged.connect(self._on_system_changed)
         test_form.addRow(self.tm('data_system_type') + ':', self.system_combo)
 
         self.n_points_input = QLineEdit()
@@ -679,6 +682,30 @@ class DataLoadPanel(QWidget):
 
         except Exception:
             pass
+
+    # Sistem-bazli optimal dt onerileri (test_dt_sweep.py sonuclari).
+    # ODE sistemleri icin Rosenstein hatasini minimize eden dt; map'ler icin 1.0.
+    OPTIMAL_DT_BY_SYSTEM = {
+        'lorenz':   '0.02',
+        'rossler':  '0.02',
+        'chua':     '0.1',
+        'chen':     '0.01',
+        'duffing':  '0.02',
+        'logistic': '1.0',
+        'henon':    '1.0',
+        'tent':     '1.0',
+        'sine':     '1.0',
+        'ikeda':    '1.0',
+    }
+
+    def _on_system_changed(self):
+        """Sistem secimine gore dt onerisini guncelle (kullanici override edebilir)."""
+        sys_key = self.system_combo.currentData()
+        if not sys_key:
+            return
+        recommended = self.OPTIMAL_DT_BY_SYSTEM.get(sys_key)
+        if recommended is not None:
+            self.dt_gen_input.setText(recommended)
 
     def on_output_var_changed(self):
         """Çıktı değişkeni seçilince yeniden entegrasyon yapmadan grafiği güncelle."""

@@ -160,8 +160,10 @@ ODE_SYSTEM_REGISTRY = {
     'rossler':         {'factory': rossler_system,        'dim': 3, 'y0': [1.0, 1.0, 1.0]},
     'chua':            {'factory': chua_system,           'dim': 3, 'y0': [0.7, 0.0, 0.0]},
     'chen':            {'factory': chen_system,           'dim': 3, 'y0': [-10.0, 0.0, 37.0]},
-    'duffing':         {'factory': duffing_system,        'dim': 2, 'y0': [0.0, 0.0]},
-    'double_pendulum': {'factory': double_pendulum_system,'dim': 4, 'y0': [0.5, 0.5, 0.0, 0.0]},
+    'duffing':         {'factory': duffing_system,        'dim': 2, 'y0': [1.0, 0.0]},
+    # Double pendulum kaotik rejim: theta1=theta2=pi/2 (kucuk acilar yetersiz).
+    'double_pendulum': {'factory': double_pendulum_system,'dim': 4,
+                        'y0': [float(np.pi)/2, float(np.pi)/2, 0.0, 0.0]},
 }
 
 
