@@ -59,19 +59,70 @@ def compute_ami(data: np.ndarray, max_lag: int = None, bins: int = 64) -> np.nda
 def find_first_minimum(ami: np.ndarray) -> int:
     """
     Find first local minimum in AMI
-    
+
     Args:
         ami: AMI array
-    
+
     Returns:
         lag of first minimum (1-indexed)
     """
     if len(ami) < 3:
         return 1
-    
+
     for i in range(1, len(ami) - 1):
         if ami[i] < ami[i-1] and ami[i] < ami[i+1]:
             return i + 1
-    
+
     # If no minimum found, return lag with global minimum
     return int(np.argmin(ami)) + 1
+
+
+def estimate_tau_robust(data: np.ndarray,
+                        max_lag_initial: int = 100,
+                        max_lag_extended: int = 1000) -> int:
+    """
+    Robust tau estimate with auto-fallback for tau saturation.
+
+    Bazi sistemlerde (ornek: Double Pendulum, slow rotational systems)
+    standart max_lag=100 yetersiz kalir; AMI bu aralikta ilk minimumu
+    bulamaz ve tau=max_lag'a "yapisir". Bu durumda max_lag genisletilir.
+
+    Strateji:
+    1. AMI(max_lag=max_lag_initial) -> first_minimum
+    2. tau >= max_lag_initial - 1 (saturate) ise:
+       AMI(max_lag=max_lag_extended) ile yeniden dene
+    3. Hala saturate ise ACF 1/e gecisini kullan (fallback)
+
+    Args:
+        data: 1D zaman serisi
+        max_lag_initial: ilk deneme icin max lag (default 100)
+        max_lag_extended: saturate olursa kullanilacak genisletilmis max lag
+
+    Returns:
+        Tau (lag, 1-indexed)
+    """
+    ami = compute_ami(data, max_lag=max_lag_initial)
+    tau = find_first_minimum(ami)
+
+    # Saturate kontrolu: tau max_lag'a cok yakinsa AMI hâlâ azaliyor demektir
+    if tau >= max_lag_initial - 1:
+        max_lag_extended = min(max_lag_extended, len(data) - 1)
+        if max_lag_extended > max_lag_initial:
+            ami_ext = compute_ami(data, max_lag=max_lag_extended)
+            tau = find_first_minimum(ami_ext)
+            # Hala saturate ise ACF fallback (1/e veya zero-crossing)
+            if tau >= max_lag_extended - 1:
+                from .acf import compute_acf
+                acf = compute_acf(data, max_lag=max_lag_extended)
+                # Once zero-crossing dene
+                zero_idx = np.where(np.diff(np.sign(acf)))[0]
+                if len(zero_idx) > 0:
+                    tau = int(zero_idx[0]) + 1
+                else:
+                    # 1/e gecisi
+                    e_thresh = 1.0 / np.e
+                    e_idx = np.where(acf < e_thresh)[0]
+                    if len(e_idx) > 0:
+                        tau = int(e_idx[0]) + 1
+
+    return max(1, int(tau))

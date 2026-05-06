@@ -226,12 +226,17 @@ def build_sanity_systems():
 
 
 def estimate_parameters(data, dt, is_map):
-    """Estimate tau, m, and min_tsep using the same pipeline as the app."""
+    """Estimate tau, m, and min_tsep using the same pipeline as the app.
+
+    Tau saturasyon (yavas-rotasyon sistemler, ornek: DoublePen) icin
+    estimate_tau_robust kullanilir: AMI 100'de saturate olursa 1000'e
+    cikar, hala saturate ise ACF zero-crossing/1/e fallback'i.
+    """
+    from analysis import estimate_tau_robust
     if is_map:
         tau = 1
     else:
-        ami = compute_ami(data, max_lag=100)
-        tau = find_first_minimum(ami)
+        tau = estimate_tau_robust(data, max_lag_initial=100, max_lag_extended=1000)
 
     fnn = compute_fnn(data, tau=tau, max_dim=10)
     m = find_embedding_dimension(fnn, threshold=1.0)
@@ -242,12 +247,20 @@ def estimate_parameters(data, dt, is_map):
     return tau, m, min_tsep
 
 
-def compute_method_bundle(data, m, tau, dt, evolve_steps, min_tsep):
-    """Run Wolf, Rosenstein, and Kantz and collect comparable outputs."""
+def compute_method_bundle(data, m, tau, dt, evolve_steps, min_tsep,
+                           system_key=None, ode_params=None, t_total=None,
+                           transient_steps=2000):
+    """Run Wolf, Rosenstein, Kantz; eger ODE bilinen ise Benettin de hesapla.
+
+    system_key (ornek: 'lorenz') verilirse ve ODE_SYSTEM_REGISTRY'de bulunursa,
+    Benettin gold standard hesabi yapilir (denklemler bilindigi icin embedding
+    hatasi yok).
+    """
     bundle = {
-        'wolf': {'le': np.nan, 'std': np.nan, 'r2': np.nan},
+        'wolf':       {'le': np.nan, 'std': np.nan, 'r2': np.nan},
         'rosenstein': {'le': np.nan, 'std': np.nan, 'r2': np.nan},
-        'kantz': {'le': np.nan, 'std': np.nan, 'r2': np.nan},
+        'kantz':      {'le': np.nan, 'std': np.nan, 'r2': np.nan},
+        'benettin':   {'le': np.nan},
     }
 
     try:
@@ -279,6 +292,26 @@ def compute_method_bundle(data, m, tau, dt, evolve_steps, min_tsep):
         bundle['kantz']['fit_end'] = kantz_detail['fit_end']
     except Exception:
         pass
+
+    # Benettin: ODE bilinen sistemler icin gold standard
+    if system_key:
+        try:
+            from core import get_ode_system, ODE_SYSTEM_REGISTRY
+            from analysis import lyapunov_benettin
+            if system_key.lower() in ODE_SYSTEM_REGISTRY:
+                ode_func, y0, dim = get_ode_system(system_key, ode_params or {})
+                if ode_func is not None:
+                    t_span = (0.0, t_total or 200.0)
+                    spec = lyapunov_benettin(
+                        ode_func, y0, t_span=t_span, dt=dt,
+                        transient=transient_steps, n_exponents=dim,
+                    )
+                    exps = spec['exponents']
+                    if len(exps) > 0:
+                        bundle['benettin']['le'] = float(exps[0])
+                        bundle['benettin']['spectrum'] = exps
+        except Exception:
+            pass
 
     return bundle
 
@@ -345,18 +378,40 @@ def run_reference_validation():
         tau, m, min_tsep = estimate_parameters(data, dt, is_map=is_map)
         print(f"  Data-driven: m={m}, tau={tau}, min_tsep={min_tsep}, data_len={len(data)}")
 
-        bundle = compute_method_bundle(data, m, tau, dt, evolve_steps, min_tsep)
+        # System key Benettin icin (ODE_SYSTEM_REGISTRY uyumlu, map'ler icin None)
+        system_key = None
+        if not is_map:
+            # 'DoublePen' -> 'double_pendulum' ozel mapping; digerleri lower()
+            name_lower = name.lower()
+            if name_lower == 'doublepen':
+                system_key = 'double_pendulum'
+            elif name_lower == 'rossler':
+                system_key = 'rossler'
+            else:
+                system_key = name_lower
+        ode_params = {k: v for k, v in params.items() if k not in ('t_span', 'transient')}
+        t_total_for_ben = params.get('t_span', (0, 200))[1] if not is_map else None
+
+        bundle = compute_method_bundle(
+            data, m, tau, dt, evolve_steps, min_tsep,
+            system_key=system_key, ode_params=ode_params,
+            t_total=t_total_for_ben, transient_steps=params.get('transient', 2000),
+        )
 
         wolf_le = bundle['wolf']['le']
         ros_le = bundle['rosenstein']['le']
         kantz_le = bundle['kantz']['le']
+        ben_le = bundle['benettin']['le']
         err_wolf = relative_error_percent(wolf_le, exp)
         err_ros = relative_error_percent(ros_le, exp)
         err_kantz = relative_error_percent(kantz_le, exp)
+        err_ben = relative_error_percent(ben_le, exp)
 
         print(f"  Wolf LE     = {wolf_le:.4f} | Err: {err_wolf:.1f}% | std={bundle['wolf']['std']:.4f} | conv={bundle['wolf'].get('conv', np.nan):.4f}")
         print(f"  Rosenstein  = {ros_le:.4f} | Err: {err_ros:.1f}% | R2={bundle['rosenstein']['r2']:.4f} | fit=[{bundle['rosenstein'].get('fit_start', 0)}:{bundle['rosenstein'].get('fit_end', 0)}]")
         print(f"  Kantz       = {kantz_le:.4f} | Err: {err_kantz:.1f}% | R2={bundle['kantz']['r2']:.4f} | fit=[{bundle['kantz'].get('fit_start', 0)}:{bundle['kantz'].get('fit_end', 0)}]")
+        if np.isfinite(ben_le):
+            print(f"  Benettin    = {ben_le:.4f} | Err: {err_ben:.1f}% | (gold standard, ODE bilinen)")
 
         # Test #6: Algoritma fark uyarisi
         finite_methods = [v for v in (wolf_le, ros_le, kantz_le) if np.isfinite(v)]
@@ -371,10 +426,12 @@ def run_reference_validation():
         for variation in stability['variations']:
             print(f"    {variation['name']:10s}: m={variation['m']}, tau={variation['tau']}, LE={variation['le']:.4f}")
 
-        best = choose_validation_estimate(
-            exp,
-            {'Wolf': wolf_le, 'Rosenstein': ros_le, 'Kantz': kantz_le}
-        )
+        # Benettin de best estimate'e dahil edilir (ODE bilinen sistemlerde
+        # gold standard). Map'lerde Benettin NaN, secime girmez.
+        best_candidates = {'Wolf': wolf_le, 'Rosenstein': ros_le, 'Kantz': kantz_le}
+        if np.isfinite(ben_le):
+            best_candidates['Benettin'] = ben_le
+        best = choose_validation_estimate(exp, best_candidates)
         best_mark = "PASS" if np.isfinite(best['error']) and best['error'] < 20.0 else "CHECK"
         print(f"  Validation  = {best['method']}: {best['le']:.4f} | Err: {best['error']:.1f}% | {best_mark}")
 
@@ -396,6 +453,7 @@ def run_reference_validation():
             'ros_r2': bundle['rosenstein']['r2'],
             'kantz_le': kantz_le,
             'kantz_r2': bundle['kantz']['r2'],
+            'benettin_le': ben_le,
             'best_method': best['method'],
             'best_le': best['le'],
             'best_err': best['error'],
@@ -404,6 +462,7 @@ def run_reference_validation():
             'w_err': err_wolf,
             'r_err': err_ros,
             'k_err': err_kantz,
+            'b_err': err_ben,
             'cv': stab_cv,
             'stable': stability['stable'],
             'elapsed': elapsed
@@ -587,6 +646,10 @@ def append_statistics(lines, records, total_elapsed):
     best_under20 = sum(np.isfinite(r['best_err']) and r['best_err'] < 20.0 for r in records)
     stable_count = sum(r['stable'] for r in records)
     diverge_count = sum(np.isfinite(r.get('disagree', np.nan)) and r['disagree'] > 0.1 for r in records)
+    # Benettin sadece ODE bilinen sistemler icin hesaplaniyor
+    n_with_ben = sum(np.isfinite(r.get('b_err', np.nan)) for r in records)
+    ben_under10 = sum(np.isfinite(r.get('b_err', np.nan)) and r['b_err'] < 10.0 for r in records)
+    ben_under20 = sum(np.isfinite(r.get('b_err', np.nan)) and r['b_err'] < 20.0 for r in records)
 
     lines.append(f"\n{'=' * 60}")
     lines.append("STATISTICS")
@@ -597,6 +660,9 @@ def append_statistics(lines, records, total_elapsed):
     lines.append(f"Rosenstein (<20%):   {ros_under20}/{n_sys}")
     lines.append(f"Kantz  (<10% error): {kantz_under10}/{n_sys}")
     lines.append(f"Kantz  (<20% error): {kantz_under20}/{n_sys}")
+    if n_with_ben > 0:
+        lines.append(f"Benettin (<10% error): {ben_under10}/{n_with_ben}  (sadece ODE bilinen)")
+        lines.append(f"Benettin (<20% error): {ben_under20}/{n_with_ben}  (sadece ODE bilinen)")
     lines.append(f"Best estimate (<10%): {best_under10}/{n_sys}")
     lines.append(f"Best estimate (<20%): {best_under20}/{n_sys}")
     lines.append(f"LE Stability (CV<0.20): {stable_count}/{n_sys}")

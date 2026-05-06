@@ -4,7 +4,7 @@ Analysis module initialization
 from .acf import compute_acf
 from .pacf import compute_pacf
 from .fft import compute_fft
-from .ami import compute_ami, find_first_minimum
+from .ami import compute_ami, find_first_minimum, estimate_tau_robust
 from .fnn import compute_fnn, find_embedding_dimension
 from .embedding import embed_timeseries
 from .lyapunov import (
@@ -37,6 +37,7 @@ __all__ = [
     'compute_fft',
     'compute_ami',
     'find_first_minimum',
+    'estimate_tau_robust',
     'compute_fnn',
     'find_embedding_dimension',
     'embed_timeseries',

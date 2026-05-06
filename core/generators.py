@@ -154,10 +154,18 @@ def generate_duffing(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 50
 def generate_double_pendulum(y0: np.ndarray = None, t_span: Tuple[float, float] = (0, 200),
                              dt: float = 0.01, m1: float = 1.0, m2: float = 1.0,
                              l1: float = 1.0, l2: float = 1.0, g: float = 9.81) -> TimeSeries:
-    """Cift sarkac zaman serisi (kaotik rejim: theta1=theta2=pi/2, LE~0.5)"""
+    """Cift sarkac zaman serisi.
+
+    Default y0=[pi/3, pi/3, 0, 0] mid-energy kaotik rejim, literatur
+    lambda1~0.5 ile uyumlu (Benettin ile dogrulandi: 0.5028).
+
+    Diger rejimler:
+    - Yuksek-enerji [pi/2, pi/2, 0, 0]: tam rotasyon, lambda1~0.64
+    - Dusuk-enerji [0.5, 0.5, 0, 0]: kucuk salinim, lambda1~0.01 (periyodik)
+    """
     from .integrators import integrate_ode, double_pendulum_system
     if y0 is None:
-        y0 = np.array([np.pi / 2, np.pi / 2, 0.0, 0.0])
+        y0 = np.array([np.pi / 3, np.pi / 3, 0.0, 0.0])
     f = double_pendulum_system(m1=m1, m2=m2, l1=l1, l2=l2, g=g)
     return integrate_ode(f, y0, t_span, dt, system_name="double_pendulum",
                          params={'m1': m1, 'm2': m2, 'l1': l1, 'l2': l2, 'g': g})

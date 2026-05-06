@@ -161,9 +161,12 @@ ODE_SYSTEM_REGISTRY = {
     'chua':            {'factory': chua_system,           'dim': 3, 'y0': [0.7, 0.0, 0.0]},
     'chen':            {'factory': chen_system,           'dim': 3, 'y0': [-10.0, 0.0, 37.0]},
     'duffing':         {'factory': duffing_system,        'dim': 2, 'y0': [1.0, 0.0]},
-    # Double pendulum kaotik rejim: theta1=theta2=pi/2 (kucuk acilar yetersiz).
+    # Double pendulum: mid-energy rejim (theta1=theta2=pi/3) literatur lambda~0.5'e
+    # uyumlu. Yuksek-enerji (pi/2) tam rotasyon yapar, lambda~0.65 (rejim
+    # bagimli). Dusuk enerji (~0.5 rad) ise periyodik. Mid = "klasik kaotik
+    # attractor" rejimi, literatur referansiyla uyumlu.
     'double_pendulum': {'factory': double_pendulum_system,'dim': 4,
-                        'y0': [float(np.pi)/2, float(np.pi)/2, 0.0, 0.0]},
+                        'y0': [float(np.pi)/3, float(np.pi)/3, 0.0, 0.0]},
 }
 
 
