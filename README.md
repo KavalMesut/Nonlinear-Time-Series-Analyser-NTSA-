@@ -1,4 +1,4 @@
-# Time Series Analyser (TSA)
+# Nonlinear-Time Series Analyser (TSA)
 
 A desktop application for nonlinear analysis of chaotic time series. Provides data loading, parameter estimation (AMI + FNN), Lyapunov exponent computation (Wolf & Rosenstein), and correlation dimension analysis in a unified pipeline.
 
