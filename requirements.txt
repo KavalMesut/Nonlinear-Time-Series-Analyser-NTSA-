@@ -5,3 +5,4 @@ pyqtgraph>=0.13.0
 PyWavelets>=1.4.0
 pyinstaller>=5.0.0
 sympy>=1.12
+openpyxl>=3.0.0

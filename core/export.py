@@ -141,6 +141,125 @@ def _make_json_serializable(obj):
         return obj
 
 
+# ---------------------------------------------------------------------------
+# Generic table-style data export (data table panelinin sag-tik export'u icin)
+# ---------------------------------------------------------------------------
+
+def export_table_data_csv(headers, rows, filepath: str,
+                          metadata: Optional[Dict[str, Any]] = None) -> bool:
+    """
+    Tablo verisini (sutun basliklari + satirlar) CSV formatinda yazar.
+
+    metadata varsa basa "# key: value" yorum satirlari eklenir.
+    """
+    import csv
+    try:
+        with open(filepath, 'w', encoding='utf-8', newline='') as f:
+            if metadata:
+                for k, v in metadata.items():
+                    f.write(f"# {k}: {v}\n")
+                f.write("#\n")
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            for row in rows:
+                writer.writerow(row)
+        return True
+    except Exception as e:
+        print(f"CSV table export error: {e}")
+        return False
+
+
+def export_table_data_xlsx(headers, rows, filepath: str,
+                           metadata: Optional[Dict[str, Any]] = None) -> bool:
+    """
+    Tablo verisini XLSX (Excel) formatinda yazar.
+
+    metadata varsa ilk satirlara "# key: value" olarak yazilir.
+    Sayisal degerler float olarak saklanir (Excel formul/sort uyumu).
+    """
+    try:
+        from openpyxl import Workbook
+    except ImportError:
+        print("XLSX export requires openpyxl: pip install openpyxl")
+        return False
+
+    try:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+
+        row_idx = 1
+        if metadata:
+            for k, v in metadata.items():
+                ws.cell(row=row_idx, column=1, value=f"# {k}: {v}")
+                row_idx += 1
+            row_idx += 1  # bos satir
+
+        # Headers (bold)
+        from openpyxl.styles import Font
+        bold = Font(bold=True)
+        for col_idx, h in enumerate(headers, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=str(h))
+            cell.font = bold
+        row_idx += 1
+
+        # Data rows
+        for row in rows:
+            for col_idx, val in enumerate(row, start=1):
+                # Sayisal degerleri float olarak yaz
+                if isinstance(val, (int, np.integer)):
+                    ws.cell(row=row_idx, column=col_idx, value=int(val))
+                elif isinstance(val, (float, np.floating)):
+                    ws.cell(row=row_idx, column=col_idx, value=float(val))
+                else:
+                    ws.cell(row=row_idx, column=col_idx, value=str(val))
+            row_idx += 1
+
+        # Sutun genislikleri otomatik (basit heuristik)
+        for col_idx, h in enumerate(headers, start=1):
+            ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = max(12, len(str(h)) + 2)
+
+        wb.save(filepath)
+        return True
+    except Exception as e:
+        print(f"XLSX table export error: {e}")
+        return False
+
+
+def export_table_data_txt(headers, rows, filepath: str,
+                          metadata: Optional[Dict[str, Any]] = None,
+                          separator: str = '\t') -> bool:
+    """
+    Tablo verisini metin dosyasina yazar (varsayilan ayrim: tab).
+
+    metadata varsa basa "# key: value" yorum satirlari eklenir.
+    """
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            if metadata:
+                for k, v in metadata.items():
+                    f.write(f"# {k}: {v}\n")
+                f.write("#\n")
+            f.write(separator.join(str(h) for h in headers) + "\n")
+            for row in rows:
+                f.write(separator.join(_format_cell(v) for v in row) + "\n")
+        return True
+    except Exception as e:
+        print(f"TXT table export error: {e}")
+        return False
+
+
+def _format_cell(val) -> str:
+    """Hucre degerini metin olarak duzenle (float'lar 6g)."""
+    if isinstance(val, (int, np.integer)):
+        return str(int(val))
+    if isinstance(val, (float, np.floating)):
+        if np.isnan(val):
+            return "nan"
+        return f"{float(val):.6g}"
+    return str(val)
+
+
 def create_analysis_summary(timeseries, analysis_results: Dict[str, Any]) -> Dict[str, Any]:
     """
     Tam analiz özeti oluştur (session kaydetmek için).

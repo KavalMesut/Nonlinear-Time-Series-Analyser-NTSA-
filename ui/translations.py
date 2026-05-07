@@ -96,6 +96,12 @@ class Translations:
         'table_value':         {'tr': 'Değer',             'en': 'Value'},
         'table_mean':          {'tr': 'Ort',               'en': 'Mean'},
         'table_std':           {'tr': 'Std',               'en': 'Std'},
+        'table_export_csv':    {'tr': 'CSV olarak dışa aktar…',       'en': 'Export as CSV…'},
+        'table_export_xlsx':   {'tr': 'Excel (XLSX) olarak dışa aktar…', 'en': 'Export as Excel (XLSX)…'},
+        'table_export_txt':    {'tr': 'TXT olarak dışa aktar…',       'en': 'Export as TXT…'},
+        'table_export_dialog_title': {'tr': 'Veriyi Dışa Aktar',     'en': 'Export Data'},
+        'table_export_success': {'tr': 'Başarılı',                    'en': 'Success'},
+        'table_export_failed':  {'tr': 'Dışa aktarma hatası',         'en': 'Export failed'},
         'msg_unknown':         {'tr': 'Bilinmiyor',        'en': 'Unknown'},
 
         # Plot panel

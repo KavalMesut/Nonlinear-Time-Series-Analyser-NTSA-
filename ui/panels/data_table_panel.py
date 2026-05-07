@@ -1,10 +1,13 @@
 """
 Data table panel — Excel benzeri tablo ile veriyi gosterir.
 Sutun basliklari ve birimleri ile.
+
+Sag-tik context menu ile veri CSV / XLSX / TXT olarak export edilebilir.
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QHeaderView, QLabel, QGroupBox, QFormLayout
+    QHeaderView, QLabel, QGroupBox, QFormLayout,
+    QMenu, QFileDialog, QMessageBox,
 )
 from PySide6.QtCore import Qt
 import numpy as np
@@ -55,6 +58,10 @@ class DataTablePanel(QWidget):
         header = self.table.horizontalHeader()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QHeaderView.Interactive)
+
+        # Sag-tik context menu (CSV/XLSX/TXT export icin)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
 
         layout.addWidget(self.table)
 
@@ -224,6 +231,146 @@ class DataTablePanel(QWidget):
         if isinstance(system_name, str) and system_name.startswith('Preprocessing: '):
             return f"{self.tm('plot_preprocessing')}: {system_name.split(': ', 1)[1]}"
         return mapping.get(system_name, system_name)
+
+    # ------------------------------------------------------------------
+    # Sag-tik context menu — Export (CSV / XLSX / TXT)
+    # ------------------------------------------------------------------
+
+    def _show_context_menu(self, position):
+        """Tablo uzerine sag tiklayinca menuyu goster."""
+        if self._current_timeseries is None:
+            return  # Veri yokken menu gosterme
+
+        menu = QMenu(self)
+        title_csv = self.tm("table_export_csv") if self.tm("table_export_csv") != "table_export_csv" else "Export as CSV…"
+        title_xlsx = self.tm("table_export_xlsx") if self.tm("table_export_xlsx") != "table_export_xlsx" else "Export as Excel (XLSX)…"
+        title_txt = self.tm("table_export_txt") if self.tm("table_export_txt") != "table_export_txt" else "Export as TXT…"
+
+        a_csv = menu.addAction(title_csv)
+        a_xlsx = menu.addAction(title_xlsx)
+        a_txt = menu.addAction(title_txt)
+
+        action = menu.exec(self.table.viewport().mapToGlobal(position))
+
+        if action == a_csv:
+            self._export_data('csv')
+        elif action == a_xlsx:
+            self._export_data('xlsx')
+        elif action == a_txt:
+            self._export_data('txt')
+
+    def _gather_table_data(self):
+        """Tablonun tum verisini (headers + rows) hazirlar.
+
+        Tablo sadece ilk 100k satiri gostermis olsa bile, burada TimeSeries'in
+        tamamini export icin alir. Cok degiskenli ODE icin all_vars_data kullanilir.
+        """
+        ts = self._current_timeseries
+        if ts is None:
+            return None, None
+
+        meta = ts.metadata or {}
+        all_vars = meta.get('all_vars_data', {})
+        is_multi = bool(all_vars and len(all_vars) > 1)
+
+        time_unit = self._guess_time_unit(ts.dt, meta)
+        value_unit = self._guess_value_unit(meta)
+        time_word = self.tm("table_time") if self.tm("table_time") != "table_time" else "Time"
+        value_word = self.tm("table_value") if self.tm("table_value") != "table_value" else "Value"
+        index_word = self.tm("table_index") if self.tm("table_index") != "table_index" else "Index"
+
+        if is_multi:
+            var_names = list(all_vars.keys())
+            headers = [index_word,
+                       f"{time_word} ({time_unit})" if time_unit else time_word] + var_names
+            var_arrays = [np.asarray(all_vars[vn]) for vn in var_names]
+        else:
+            headers = [index_word,
+                       f"{time_word} ({time_unit})" if time_unit else time_word,
+                       f"{value_word} ({value_unit})" if value_unit else value_word]
+            var_arrays = [ts.data]
+
+        n = len(ts.data)
+        rows = []
+        time_arr = ts.time
+        for i in range(n):
+            row = [i, float(time_arr[i])]
+            for arr in var_arrays:
+                row.append(float(arr[i]))
+            rows.append(row)
+        return headers, rows
+
+    def _build_export_metadata(self):
+        """Export'un basina yazilacak metadata dict'i."""
+        ts = self._current_timeseries
+        if ts is None:
+            return {}
+        meta = ts.metadata or {}
+        out = {
+            'system': meta.get('system', '?'),
+            'dt': ts.dt,
+            'n_points': len(ts.data),
+        }
+        if meta.get('params'):
+            params_str = ", ".join(
+                f"{k}={v:g}" if isinstance(v, float) else f"{k}={v}"
+                for k, v in meta['params'].items()
+            )
+            out['params'] = params_str
+        return out
+
+    def _export_data(self, fmt: str):
+        """Export tetikleyici — fmt: 'csv', 'xlsx', 'txt'."""
+        if self._current_timeseries is None:
+            return
+
+        # Default dosya adi: sistem adi varsa onu kullan
+        meta = self._current_timeseries.metadata or {}
+        sys_name = (meta.get('system') or 'timeseries').replace('/', '_')
+        default_name = f"{sys_name}.{fmt}"
+
+        filter_map = {
+            'csv':  "CSV files (*.csv);;All files (*)",
+            'xlsx': "Excel files (*.xlsx);;All files (*)",
+            'txt':  "Text files (*.txt);;All files (*)",
+        }
+        title = self.tm("table_export_dialog_title") if self.tm("table_export_dialog_title") != "table_export_dialog_title" else "Export data"
+
+        filepath, _ = QFileDialog.getSaveFileName(
+            self, title, default_name, filter_map.get(fmt, "All files (*)")
+        )
+        if not filepath:
+            return
+
+        # Veriyi hazirla
+        headers, rows = self._gather_table_data()
+        if not headers:
+            return
+        export_meta = self._build_export_metadata()
+
+        # Export
+        try:
+            from core.export import (
+                export_table_data_csv, export_table_data_xlsx, export_table_data_txt,
+            )
+            if fmt == 'csv':
+                ok = export_table_data_csv(headers, rows, filepath, metadata=export_meta)
+            elif fmt == 'xlsx':
+                ok = export_table_data_xlsx(headers, rows, filepath, metadata=export_meta)
+            elif fmt == 'txt':
+                ok = export_table_data_txt(headers, rows, filepath, metadata=export_meta)
+            else:
+                ok = False
+
+            if ok:
+                msg = self.tm("table_export_success") if self.tm("table_export_success") != "table_export_success" else "Exported successfully"
+                QMessageBox.information(self, msg, f"{filepath}")
+            else:
+                err = self.tm("table_export_failed") if self.tm("table_export_failed") != "table_export_failed" else "Export failed"
+                QMessageBox.warning(self, err,
+                                    "Check console / dependencies (XLSX needs openpyxl).")
+        except Exception as e:
+            QMessageBox.warning(self, "Export error", str(e))
 
     def refresh_ui(self):
         """Dil değiştiğinde özet alanını ve mevcut tabloyu güncelle."""
